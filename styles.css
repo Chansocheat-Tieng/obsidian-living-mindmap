@@ -91,6 +91,11 @@
   .emm-mobile-action:disabled { opacity: .35; }
   .emm-mobile-edit-actions { top: max(70px, env(safe-area-inset-top)); }
   .emm-mobile-actions:has(~ .emm-viewport .emm-node.is-editing) { display: none; }
+  .living-mindmap-view .emm-canvas .emm-node[aria-selected="true"] {
+    outline-width: 1px;
+    outline-offset: 1px;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 35%, transparent), 0 4px 14px rgb(0 0 0 / 16%);
+  }
 }
 
 @media (min-width: 601px) and (hover: none) and (pointer: coarse) {
