@@ -16,6 +16,10 @@ function primaryModifier(event) {
   return Platform.isMacOS ? event.metaKey : event.ctrlKey;
 }
 
+function isMobileRuntime() {
+  return Boolean(Platform.isMobile || Platform.isMobileApp || document.body?.classList.contains("is-mobile"));
+}
+
 function shortcutLetter(event) {
   if (event.code === "KeyB") return "b";
   if (event.code === "KeyI") return "i";
@@ -222,7 +226,7 @@ class EditableMindMapView extends ItemView {
 
   async onOpen() {
     this.contentEl.addClass("living-mindmap-view");
-    this.contentEl.toggleClass("is-tablet-layout", Boolean(Platform.isMobile && !Platform.isPhone));
+    this.contentEl.toggleClass("is-tablet-layout", Boolean(isMobileRuntime() && !Platform.isPhone));
     this.registerDomEvent(window, "keydown", (event) => {
       if (this.app.workspace.getActiveViewOfType(EditableMindMapView) !== this) return;
       if (!primaryModifier(event)) return;
@@ -350,6 +354,11 @@ class EditableMindMapView extends ItemView {
           this.render(false);
         });
       }
+      let lastPointerWasTouch = false;
+      let lastTouchTap = 0;
+      el.addEventListener("pointerdown", (event) => {
+        lastPointerWasTouch = event.pointerType === "touch" && !event.target.closest(".emm-collapse, .emm-editor");
+      });
       el.addEventListener("click", (event) => {
         if (event.shiftKey) {
           this.selectedIds.has(node.id) ? this.selectedIds.delete(node.id) : this.selectedIds.add(node.id);
@@ -358,6 +367,14 @@ class EditableMindMapView extends ItemView {
         }
         this.selectedId = node.id;
         this.updateSelection(canvas); viewport.focus();
+        if (lastPointerWasTouch) {
+          const now = Date.now();
+          if (now - lastTouchTap < 350) {
+            lastTouchTap = 0;
+            window.setTimeout(() => this.beginEdit(node, el), 0);
+          } else lastTouchTap = now;
+        }
+        lastPointerWasTouch = false;
       });
       el.addEventListener("dblclick", (event) => { event.preventDefault(); this.beginEdit(node, el); });
       el.addEventListener("contextmenu", (event) => {
@@ -810,17 +827,40 @@ class EditableMindMapView extends ItemView {
 
   async beginEdit(node, element) {
     if (node.empty) return this.createFirstTopic();
+    if (!element || element.hasClass("is-editing")) return;
     element.addClass("is-editing");
     const input = element.createEl("textarea", { cls: "emm-editor" });
     input.value = node.rawText || node.text;
     input.rows = 1;
     input.focus(); input.select();
     const editActions = this.contentEl.querySelector(".emm-shell")?.createDiv({ cls: "emm-mobile-edit-actions" });
+    let toolbarInteractionUntil = 0;
+    const preserveEditorForToolbar = (event) => {
+      toolbarInteractionUntil = Date.now() + 700;
+      event.preventDefault();
+    };
+    editActions?.addEventListener("touchstart", preserveEditorForToolbar, { capture: true, passive: false });
+    editActions?.addEventListener("pointerdown", preserveEditorForToolbar, { capture: true });
     const editButton = (label, icon, action) => {
-      const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label } });
+      const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label, type: "button", tabindex: "-1" } });
       if (button) {
         setIcon(button, icon);
-        button.addEventListener("pointerdown", (event) => event.preventDefault()); button.addEventListener("click", action);
+        let lastActivation = 0;
+        const activate = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const now = Date.now();
+          if (now - lastActivation < 400) return;
+          lastActivation = now;
+          toolbarInteractionUntil = now + 700;
+          action();
+          if (input.isConnected) input.focus({ preventScroll: true });
+        };
+        // Mobile browsers blur the textarea before dispatching click. Run the
+        // action at gesture start and suppress the later synthetic click.
+        button.addEventListener("touchstart", activate, { passive: false });
+        button.addEventListener("pointerdown", activate);
+        button.addEventListener("click", activate);
       }
     };
     let done = false;
@@ -862,7 +902,18 @@ class EditableMindMapView extends ItemView {
     ["pointerdown", "pointermove", "pointerup", "click", "dblclick"].forEach((type) => {
       input.addEventListener(type, (event) => event.stopPropagation());
     });
-    input.addEventListener("blur", () => commit());
+    input.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (done) return;
+        // Mobile focus transitions are inconsistent and can happen before a
+        // toolbar click. Keep the editor alive until an explicit action ends it.
+        if (isMobileRuntime() || Date.now() < toolbarInteractionUntil) {
+          input.focus({ preventScroll: true });
+          return;
+        }
+        commit();
+      }, 0);
+    });
   }
 
   toggleInlineFormat(input, marker) {
