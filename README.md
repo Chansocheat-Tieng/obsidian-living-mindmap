@@ -8,33 +8,86 @@ Open a Markdown note and run **Living Mindmap: Open editable mind map**.
 
 ## Commands and controls
 
-| Context | Input | Action |
-| --- | --- | --- |
-| Node | Double-click or `F2` | Edit the node text |
-| Selected node | `Tab` | Create a child |
-| Selected node | `Enter` | Create a sibling at the same level |
-| Editing | `Enter` or `Tab` | Save without creating another node |
-| Editing | `Shift+Enter` | Save and create a sibling |
-| Editing | `Shift+Tab` | Save and create a child |
-| Editing or selected nodes | `Ctrl+B` / `Cmd+B` | Toggle bold formatting |
-| Editing or selected nodes | `Ctrl+I` / `Cmd+I` | Toggle italic formatting |
-| Selected nodes | `Delete` or `Backspace` | Delete the nodes and their descendants |
-| Mindmap view | `Ctrl+Z` / `Cmd+Z` | Undo |
-| Mindmap view | `Ctrl+Y` / `Cmd+Y` | Redo |
-| Selection | Shift-click | Add or remove an individual node from the selection |
-| Empty canvas | Left-drag | Select multiple nodes with a selection rectangle |
-| Empty canvas | Right-drag | Pan the view |
-| Empty canvas | Mouse wheel | Zoom in or out |
-| Node drag | Drop in the center | Move the selected branch beneath a new parent |
-| Node drag, horizontal layout | Drop near the top or bottom | Reorder siblings |
-| Node drag, vertical layout | Drop near the left or right | Reorder siblings |
-| Node | Right-click | Convert between a heading and regular list content |
+### Selected nodes
+
+These commands apply after clicking a node. Use Shift-click or a selection rectangle to apply formatting and deletion to multiple nodes.
+
+| Input | Action |
+| --- | --- |
+| Double-click or `F2` | Start editing the primary selected node |
+| `Tab` | Create a child |
+| `Enter` | Create a sibling at the same level |
+| `Ctrl+B` / `Cmd+B` | Toggle bold formatting on the selected nodes |
+| `Ctrl+I` / `Cmd+I` | Toggle italic formatting on the selected nodes |
+| `Delete` or `Backspace` | Delete the selected nodes and their descendants |
+| `Ctrl+Z` / `Cmd+Z` | Undo the latest mindmap change |
+| `Ctrl+Y` / `Cmd+Y` | Redo the latest mindmap change |
+
+### Inline editing
+
+These commands apply while the text editor is visible inside a node.
+
+| Input | Action |
+| --- | --- |
+| `Enter` or `Tab` | Save the edit without creating another node |
+| `Shift+Enter` | Save and create a sibling |
+| `Shift+Tab` | Save and create a child |
+| `Ctrl+B` / `Cmd+B` | Toggle bold formatting on the selected text |
+| `Ctrl+I` / `Cmd+I` | Toggle italic formatting on the selected text |
+| `Ctrl+Z` / `Cmd+Z` | Undo |
+| `Ctrl+Y` / `Cmd+Y` | Redo |
+| `Escape` | Cancel editing |
+
+On Linux and Windows, use `Ctrl`. On macOS, use `Cmd`.
+
+### Canvas navigation and selection
+
+| Input | Action |
+| --- | --- |
+| Click a node | Select only that node |
+| Shift-click a node | Add or remove it from the current selection |
+| Left-drag an empty area | Select multiple nodes with a selection rectangle |
+| Right-drag an empty area | Pan the view |
+| Mouse wheel | Zoom in or out |
+
+### Drag and drop
+
+Dragging a parent moves its complete descendant subtree. Dragging one node from a multi-selection moves the selected sibling branches together.
+
+| Target area | Action |
+| --- | --- |
+| Center of a node | Make the moved branches children of that node |
+| Top or bottom edge in Horizontal layout | Reorder siblings |
+| Left or right edge in Vertical layout | Reorder siblings |
+
+### Context menu
+
+Right-click a non-title node to convert it between a Markdown heading and regular list content.
+
+### Toolbar
+
+| Control | Action |
+| --- | --- |
+| Fit map | Fit and center the complete mindmap in the viewport |
+| Collapse/expand | Collapse every branch or expand them again |
+| Compact branches | Toggle between globally aligned levels and local branch spacing |
+| Branch colors | Toggle distinct colors for top-level branches |
+| Layout | Switch between Horizontal and Vertical layouts |
+| Dimensions | Adjust node width, hierarchy gaps, and sibling spacing |
 
 ## Settings
 
 Mind-map preferences are global and stored in the plugin's `data.json`, not in note frontmatter. Toolbar changes update the same global settings immediately.
 
-The settings page exposes layout, maximum node width, spacing mode, branch colors, parent-to-child distance, horizontal hierarchy distance, and sibling distance.
+| Setting | Purpose |
+| --- | --- |
+| Layout | Choose Horizontal or Vertical rendering |
+| Maximum node width | Set the width at which node text wraps |
+| Spacing mode | Align levels globally or compact each branch locally |
+| Branch colors | Color top-level branches and their connectors independently |
+| Horizontal hierarchy gap | Set the distance between hierarchy columns |
+| Vertical hierarchy gap | Set the distance between hierarchy rows |
+| Sibling gap | Set the minimum distance between sibling subtrees |
 
 Node text always wraps at the configured maximum width. Shorter nodes keep their natural compact width.
 
