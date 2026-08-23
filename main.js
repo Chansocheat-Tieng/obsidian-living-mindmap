@@ -16,6 +16,10 @@ function primaryModifier(event) {
   return Platform.isMacOS ? event.metaKey : event.ctrlKey;
 }
 
+function isMobileRuntime() {
+  return Boolean(Platform.isMobile || Platform.isMobileApp || document.body?.classList.contains("is-mobile"));
+}
+
 function shortcutLetter(event) {
   if (event.code === "KeyB") return "b";
   if (event.code === "KeyI") return "i";
@@ -222,7 +226,7 @@ class EditableMindMapView extends ItemView {
 
   async onOpen() {
     this.contentEl.addClass("living-mindmap-view");
-    this.contentEl.toggleClass("is-tablet-layout", Boolean(Platform.isMobile && !Platform.isPhone));
+    this.contentEl.toggleClass("is-tablet-layout", Boolean(isMobileRuntime() && !Platform.isPhone));
     this.registerDomEvent(window, "keydown", (event) => {
       if (this.app.workspace.getActiveViewOfType(EditableMindMapView) !== this) return;
       if (!primaryModifier(event)) return;
@@ -889,7 +893,7 @@ class EditableMindMapView extends ItemView {
         if (done) return;
         // Mobile focus transitions are inconsistent and can happen before a
         // toolbar click. Keep the editor alive until an explicit action ends it.
-        if (Platform.isMobile || Date.now() < toolbarInteractionUntil) {
+        if (isMobileRuntime() || Date.now() < toolbarInteractionUntil) {
           input.focus({ preventScroll: true });
           return;
         }
