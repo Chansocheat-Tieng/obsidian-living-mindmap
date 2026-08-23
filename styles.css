@@ -20,7 +20,7 @@
 .emm-canvas.is-vertical-layout .emm-node.drop-before::before, .emm-canvas.is-vertical-layout .emm-node.drop-after::after { top: -8px; bottom: -8px; width: 3px; height: auto; }
 .emm-canvas.is-vertical-layout .emm-node.drop-before::before { left: -8px; right: auto; }
 .emm-canvas.is-vertical-layout .emm-node.drop-after::after { left: auto; right: -8px; }
-.emm-node.is-title { padding: 13px 20px; border-width: 2px; border-radius: 14px; background: var(--interactive-accent); color: var(--text-on-accent); font-size: 1.12em; font-weight: 700; letter-spacing: .01em; }
+.emm-node.is-title { padding: 13px 20px; border-width: 2px; border-radius: 14px; background: var(--background-secondary-alt); color: var(--text-normal); font-size: 1.12em; font-weight: 700; letter-spacing: .01em; }
 .emm-node.is-heading { border-left: 4px solid var(--interactive-accent); background: var(--background-secondary-alt); font-weight: 620; }
 .emm-node[style*="--emm-branch-color"].is-heading { border-left-color: var(--emm-branch-color); }
 .emm-canvas.is-vertical-layout .emm-node.is-heading { border-left-width: 1px; border-top: 4px solid var(--interactive-accent); }
@@ -82,11 +82,10 @@
     box-shadow: 0 6px 24px rgb(0 0 0 / 22%); backdrop-filter: blur(10px);
   }
   .emm-mobile-action, .emm-mobile-edit-action {
-    display: grid; place-items: center; width: var(--emm-mobile-action-size, 28px); height: var(--emm-mobile-action-size, 28px); padding: 5px;
+    display: grid; place-items: center; width: 32px; height: 32px; padding: 6px;
     border-radius: 9px; color: var(--text-normal);
   }
   .emm-mobile-action svg, .emm-mobile-edit-action svg { width: 16px; height: 16px; }
-  .emm-mobile-action-symbol { font-size: 19px; font-weight: 650; line-height: 1; }
   .emm-mobile-action.is-danger { color: var(--text-error); }
   .emm-mobile-action:disabled { opacity: .35; }
   .emm-mobile-edit-actions { top: max(70px, env(safe-area-inset-top)); }

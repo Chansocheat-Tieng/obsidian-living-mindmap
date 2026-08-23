@@ -31,7 +31,6 @@ const DEFAULT_SETTINGS = {
   parentChildGap: 80,
   spacing: "level",
   branchColors: false,
-  mobileActionSize: 28,
 };
 
 function frontmatterEnd(lines) {
@@ -306,7 +305,6 @@ class EditableMindMapView extends ItemView {
     this.contentEl.empty();
     const props = readMindmapProperties(this.markdown, this.plugin.settings);
     const shell = this.contentEl.createDiv({ cls: "emm-shell" });
-    shell.style.setProperty("--emm-mobile-action-size", `${Math.max(24, Math.min(32, Number(this.plugin.settings.mobileActionSize) || 28))}px`);
     this.renderToolbar(shell, props);
     this.renderMobileActions(shell);
     const viewport = shell.createDiv({ cls: "emm-viewport", attr: { tabindex: "0" } });
@@ -481,15 +479,14 @@ class EditableMindMapView extends ItemView {
 
   renderMobileActions(shell) {
     const actions = shell.createDiv({ cls: "emm-mobile-actions", attr: { "aria-label": "Selected node actions" } });
-    const button = (icon, title, action, cls = "", text = "") => {
+    const button = (icon, title, action, cls = "") => {
       const el = actions.createEl("button", { cls: `emm-mobile-action ${cls}`, attr: { "aria-label": title, title } });
-      if (text) el.createSpan({ cls: "emm-mobile-action-symbol", text });
-      else setIcon(el, icon);
+      setIcon(el, icon);
       el.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); action(); });
       return el;
     };
     button("pencil", "Edit", () => this.editSelectedNode());
-    button(null, "Add child", () => this.addFromMobile(true), "", "↳");
+    button("list-tree", "Add child", () => this.addFromMobile(true));
     button("list-plus", "Add sibling", () => this.addFromMobile(false));
     button("trash-2", "Delete", () => this.deleteFromMobile(), "is-danger");
     button("undo-2", "Undo", () => this.undo());
@@ -813,11 +810,10 @@ class EditableMindMapView extends ItemView {
     input.rows = 1;
     input.focus(); input.select();
     const editActions = this.contentEl.querySelector(".emm-shell")?.createDiv({ cls: "emm-mobile-edit-actions" });
-    const editButton = (label, icon, action, text = "") => {
+    const editButton = (label, icon, action) => {
       const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label } });
       if (button) {
-        if (text) button.createSpan({ cls: "emm-mobile-action-symbol", text });
-        else setIcon(button, icon);
+        setIcon(button, icon);
         button.addEventListener("pointerdown", (event) => event.preventDefault()); button.addEventListener("click", action);
       }
     };
@@ -834,7 +830,7 @@ class EditableMindMapView extends ItemView {
     };
     editButton("Bold", "bold", () => this.toggleInlineFormat(input, "**"));
     editButton("Italic", "italic", () => this.toggleInlineFormat(input, "*"));
-    editButton("Add child", null, () => commit("child"), "↳");
+    editButton("Add child", "list-tree", () => commit("child"));
     editButton("Add sibling", "list-plus", () => commit("sibling"));
     editButton("Done", "check", () => commit());
     input.addEventListener("keydown", (event) => {
@@ -1229,9 +1225,6 @@ class EditableMindMapSettingTab extends PluginSettingTab {
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.branchColors).onChange(async (value) => {
         this.plugin.settings.branchColors = value; await this.plugin.saveSettings();
       }));
-    new Setting(containerEl).setName("Mobile action button size").setDesc("Size of the mobile node and editing action buttons. The maximum matches the map toolbar buttons.")
-      .addSlider((slider) => slider.setLimits(24, 32, 1).setDynamicTooltip().setValue(this.plugin.settings.mobileActionSize)
-        .onChange(async (value) => { this.plugin.settings.mobileActionSize = value; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Vertical hierarchy gap").setDesc("Distance between hierarchy rows in Vertical layout.")
       .addSlider((slider) => slider.setLimits(30, 180, 5).setDynamicTooltip().setValue(this.plugin.settings.parentChildGap)
         .onChange(async (value) => { this.plugin.settings.parentChildGap = value; await this.plugin.saveSettings(); }));
