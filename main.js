@@ -213,6 +213,7 @@ class EditableMindMapView extends ItemView {
     this.modifyTimer = null;
     this.undoStack = [];
     this.redoStack = [];
+    this.mobileActions = null;
   }
 
   getViewType() { return VIEW_TYPE; }
@@ -304,6 +305,7 @@ class EditableMindMapView extends ItemView {
     const props = readMindmapProperties(this.markdown, this.plugin.settings);
     const shell = this.contentEl.createDiv({ cls: "emm-shell" });
     this.renderToolbar(shell, props);
+    this.renderMobileActions(shell);
     const viewport = shell.createDiv({ cls: "emm-viewport", attr: { tabindex: "0" } });
     const canvas = viewport.createDiv({ cls: "emm-canvas" });
     canvas.toggleClass("is-horizontal-layout", props.layout === "horizontal");
@@ -472,6 +474,62 @@ class EditableMindMapView extends ItemView {
     addSlider("Sibling gap", "verticalGap", this.plugin.settings.verticalGap, 10, 120, 5);
   }
 
+  renderMobileActions(shell) {
+    const actions = shell.createDiv({ cls: "emm-mobile-actions", attr: { "aria-label": "Selected node actions" } });
+    const button = (icon, title, action, cls = "") => {
+      const el = actions.createEl("button", { cls: `emm-mobile-action ${cls}`, attr: { "aria-label": title, title } });
+      setIcon(el, icon);
+      el.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); action(); });
+      return el;
+    };
+    button("pencil", "Edit", () => this.editSelectedNode());
+    button("corner-down-right", "Add child", () => this.addFromMobile(true));
+    button("plus", "Add sibling", () => this.addFromMobile(false));
+    button("trash-2", "Delete", () => this.deleteFromMobile(), "is-danger");
+    this.mobileActions = actions;
+    this.updateMobileActions();
+  }
+
+  selectedNode() {
+    return this.tree?.flat.find((node) => node.id === this.selectedId) || null;
+  }
+
+  editSelectedNode() {
+    const node = this.selectedNode();
+    const element = this.contentEl.querySelector(`.emm-node[data-node-id="${node?.id || ""}"]`);
+    if (node && element) this.beginEdit(node, element);
+  }
+
+  async addFromMobile(child) {
+    const node = this.selectedNode();
+    if (!node) return;
+    await this.insertRelative(node, child);
+    requestAnimationFrame(() => this.editSelectedNode());
+  }
+
+  async deleteFromMobile() {
+    const roots = this.selectedRoots();
+    if (!roots.length) return;
+    const descendants = roots.reduce((total, node) => total + Math.max(0, this.subtreeNodeCount(node) - 1), 0);
+    if (descendants > 0 && !window.confirm(`Delete ${roots.length === 1 ? "this node" : `${roots.length} nodes`} and ${descendants} descendant${descendants === 1 ? "" : "s"}?`)) return;
+    await this.deleteSelectedNodes();
+    new Notice("Node deleted. Use Undo to restore it.");
+  }
+
+  subtreeNodeCount(node) {
+    return 1 + (node.children || []).reduce((sum, child) => sum + this.subtreeNodeCount(child), 0);
+  }
+
+  updateMobileActions() {
+    if (!this.mobileActions) return;
+    const node = this.selectedNode();
+    this.mobileActions.toggleClass("is-visible", Boolean(node));
+    const sibling = this.mobileActions.querySelector('[aria-label="Add sibling"]');
+    const remove = this.mobileActions.querySelector('[aria-label="Delete"]');
+    if (sibling) sibling.disabled = !node || node.id === "root";
+    if (remove) remove.disabled = !node || node.id === "root";
+  }
+
   async onClose() {
     window.clearTimeout(this.modifyTimer);
     this.loadSequence += 1;
@@ -601,7 +659,7 @@ class EditableMindMapView extends ItemView {
     viewport.addEventListener("pointerdown", (event) => {
       if (event.target.closest(".emm-node, .emm-toolbar")) return;
       startX = event.clientX; startY = event.clientY;
-      if (event.button === 2) {
+      if (event.pointerType === "touch" || event.button === 2) {
         panning = true; originX = this.panX; originY = this.panY;
         viewport.addClass("is-panning");
       } else if (event.button === 0) {
@@ -671,6 +729,7 @@ class EditableMindMapView extends ItemView {
 
   updateSelection(canvas) {
     canvas.querySelectorAll(".emm-node").forEach((el) => el.toggleClass("is-selected", this.selectedIds.has(el.dataset.nodeId)));
+    this.updateMobileActions();
   }
 
   dropMode(element, event, layout) {
@@ -694,16 +753,27 @@ class EditableMindMapView extends ItemView {
     input.value = node.rawText || node.text;
     input.rows = 1;
     input.focus(); input.select();
+    const editActions = this.contentEl.querySelector(".emm-shell")?.createDiv({ cls: "emm-mobile-edit-actions" });
+    const editButton = (label, icon, action) => {
+      const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label } });
+      if (button) { setIcon(button, icon); button.addEventListener("pointerdown", (event) => event.preventDefault()); button.addEventListener("click", action); }
+    };
     let done = false;
     const commit = async (createMode = null) => {
       if (done) return; done = true;
       const value = input.value.trim();
       element.removeClass("is-editing");
       input.remove();
+      editActions?.remove();
       if (!value && !node.children.length) await this.deleteNode(node);
       else if (value && value !== node.rawText) await this.renameNode(node, value);
       if (createMode && value) await this.insertRelative(node, createMode === "child");
     };
+    editButton("Bold", "bold", () => this.toggleInlineFormat(input, "**"));
+    editButton("Italic", "italic", () => this.toggleInlineFormat(input, "*"));
+    editButton("Add child", "corner-down-right", () => commit("child"));
+    editButton("Add sibling", "plus", () => commit("sibling"));
+    editButton("Done", "check", () => commit());
     input.addEventListener("keydown", (event) => {
       event.stopPropagation();
       if (primaryModifier(event) && ["b", "i"].includes(shortcutLetter(event))) {
@@ -721,7 +791,7 @@ class EditableMindMapView extends ItemView {
       }
       if (event.key === "Enter") { event.preventDefault(); commit(event.shiftKey ? "sibling" : null); }
       if (event.key === "Tab") { event.preventDefault(); commit(event.shiftKey ? "child" : null); }
-      if (event.key === "Escape") { done = true; element.removeClass("is-editing"); input.remove(); }
+      if (event.key === "Escape") { done = true; element.removeClass("is-editing"); input.remove(); editActions?.remove(); }
     });
     // Keep node selection and canvas panning handlers from capturing text-edit gestures.
     ["pointerdown", "pointermove", "pointerup", "click", "dblclick"].forEach((type) => {

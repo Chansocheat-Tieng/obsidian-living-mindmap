@@ -41,6 +41,7 @@
 .emm-tool { display: grid; place-items: center; width: 32px; height: 32px; padding: 6px; border-radius: 7px; color: var(--text-muted); }
 .emm-tool:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
 .emm-tool.is-active { color: var(--text-on-accent); background: var(--interactive-accent); }
+.emm-mobile-actions, .emm-mobile-edit-actions { display: none; }
 .emm-slider-menu { position: absolute; top: calc(100% + 8px); right: 0; width: 220px; max-width: calc(100vw - 40px); padding: 9px 11px; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-secondary); box-shadow: 0 8px 28px rgb(0 0 0 / 24%); }
 .emm-slider-menu[hidden] { display: none; }
 .emm-slider-row { display: block; padding: 6px 0; }
@@ -50,4 +51,25 @@
 .emm-slider-row input[type="range"]::-webkit-slider-thumb { width: 12px; height: 12px; }
 .emm-slider-row input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; }
 .living-mindmap-empty { display: grid; place-items: center; height: 100%; color: var(--text-muted); }
-@media (max-width: 600px) { .emm-toolbar { max-width: calc(100% - 28px); } .emm-slider-menu { width: min(200px, calc(100vw - 40px)); } }
+@media (max-width: 600px), (hover: none) and (pointer: coarse) {
+  .emm-toolbar { max-width: calc(100% - 28px); }
+  .emm-slider-menu { width: min(200px, calc(100vw - 40px)); }
+  .emm-node { min-height: 44px; padding: 11px 16px; }
+  .emm-collapse { width: 28px; height: 28px; right: -14px; line-height: 24px; }
+  .emm-canvas.is-vertical-layout .emm-collapse { bottom: -14px; }
+  .emm-mobile-actions.is-visible, .emm-mobile-edit-actions {
+    position: absolute; z-index: 40; left: 50%; bottom: max(14px, env(safe-area-inset-bottom));
+    display: flex; gap: 6px; padding: 7px; transform: translateX(-50%);
+    border: 1px solid var(--background-modifier-border); border-radius: 14px;
+    background: color-mix(in srgb, var(--background-secondary) 96%, transparent);
+    box-shadow: 0 6px 24px rgb(0 0 0 / 22%); backdrop-filter: blur(10px);
+  }
+  .emm-mobile-action, .emm-mobile-edit-action {
+    display: grid; place-items: center; width: 44px; height: 44px; padding: 10px;
+    border-radius: 9px; color: var(--text-normal);
+  }
+  .emm-mobile-action.is-danger { color: var(--text-error); }
+  .emm-mobile-action:disabled { opacity: .35; }
+  .emm-mobile-edit-actions { bottom: max(8px, env(safe-area-inset-bottom)); }
+  .emm-mobile-actions:has(~ .emm-viewport .emm-node.is-editing) { display: none; }
+}
