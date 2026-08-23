@@ -8,7 +8,7 @@ A polished, directly editable mindmap view for ordinary Obsidian Markdown notes.
 
 ## Usage
 
-Open a Markdown note and run **Living Mindmap: Open editable mind map**, or choose **Open as mindmap** from the document's three-dot menu.
+Open a Markdown note and run **Living Mindmap: Open as Mindmap**, or choose **Open as Mindmap** from the document's three-dot menu.
 
 On desktop, use the ribbon's **brain-circuit** icon or the command palette. On mobile, open the ribbon from Obsidian's sidebar or use the command palette.
 
