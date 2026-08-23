@@ -6,18 +6,29 @@ A polished, directly editable mindmap view for ordinary Obsidian Markdown notes.
 
 Open a Markdown note and run **Living Mindmap: Open editable mind map**.
 
-- Double-click or press `F2` on a selected node to edit it.
-- Press `Tab` on a selected node to add a child; press `Enter` to add a sibling at the same level.
-- While editing, plain `Enter` or `Tab` saves the edit without creating another node.
-- While editing, `Shift+Enter` saves and creates a sibling; `Shift+Tab` saves and creates a child.
-- While editing, use `Ctrl/Cmd+B` for bold and `Ctrl/Cmd+I` for italic.
-- With nodes selected, use `Ctrl+B` on Linux/Windows or `Cmd+B` on macOS to bold entire nodes; use `Ctrl/Cmd+I` for italic.
-- Shift-click nodes or left-drag an empty area to select multiple nodes. Right-drag the empty canvas to pan.
-- Drag a node onto another node's center to reparent it. Drop at the upper or lower edge to reorder siblings.
-- Right-click a node to convert it between a heading and regular list content.
-- Press `Delete` or `Backspace` to remove the selected node and its descendants.
-- Press `Ctrl/Cmd+Z` and `Ctrl/Cmd+Y` to undo and redo mind-map changes.
-- Right-drag the empty canvas to pan; scroll to zoom.
+## Commands and controls
+
+| Context | Input | Action |
+| --- | --- | --- |
+| Node | Double-click or `F2` | Edit the node text |
+| Selected node | `Tab` | Create a child |
+| Selected node | `Enter` | Create a sibling at the same level |
+| Editing | `Enter` or `Tab` | Save without creating another node |
+| Editing | `Shift+Enter` | Save and create a sibling |
+| Editing | `Shift+Tab` | Save and create a child |
+| Editing or selected nodes | `Ctrl+B` / `Cmd+B` | Toggle bold formatting |
+| Editing or selected nodes | `Ctrl+I` / `Cmd+I` | Toggle italic formatting |
+| Selected nodes | `Delete` or `Backspace` | Delete the nodes and their descendants |
+| Mindmap view | `Ctrl+Z` / `Cmd+Z` | Undo |
+| Mindmap view | `Ctrl+Y` / `Cmd+Y` | Redo |
+| Selection | Shift-click | Add or remove an individual node from the selection |
+| Empty canvas | Left-drag | Select multiple nodes with a selection rectangle |
+| Empty canvas | Right-drag | Pan the view |
+| Empty canvas | Mouse wheel | Zoom in or out |
+| Node drag | Drop in the center | Move the selected branch beneath a new parent |
+| Node drag, horizontal layout | Drop near the top or bottom | Reorder siblings |
+| Node drag, vertical layout | Drop near the left or right | Reorder siblings |
+| Node | Right-click | Convert between a heading and regular list content |
 
 ## Settings
 
@@ -30,3 +41,7 @@ Node text always wraps at the configured maximum width. Shorter nodes keep their
 Enable **Compact branches** in the toolbar to keep parent-to-child gaps fixed within each branch. Disable it to align every depth into global columns.
 
 Enable **Branch colors** in the toolbar to give each top-level branch its own node and connector color.
+
+## Author
+
+Created by [Chansocheat Tieng](https://github.com/Chansocheat-Tieng).
