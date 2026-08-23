@@ -816,6 +816,13 @@ class EditableMindMapView extends ItemView {
     input.rows = 1;
     input.focus(); input.select();
     const editActions = this.contentEl.querySelector(".emm-shell")?.createDiv({ cls: "emm-mobile-edit-actions" });
+    let toolbarInteractionUntil = 0;
+    const preserveEditorForToolbar = (event) => {
+      toolbarInteractionUntil = Date.now() + 700;
+      event.preventDefault();
+    };
+    editActions?.addEventListener("touchstart", preserveEditorForToolbar, { capture: true, passive: false });
+    editActions?.addEventListener("pointerdown", preserveEditorForToolbar, { capture: true });
     const editButton = (label, icon, action) => {
       const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label } });
       if (button) {
@@ -827,6 +834,7 @@ class EditableMindMapView extends ItemView {
           const now = Date.now();
           if (now - lastActivation < 400) return;
           lastActivation = now;
+          toolbarInteractionUntil = now + 700;
           action();
           if (input.isConnected) input.focus({ preventScroll: true });
         };
@@ -876,7 +884,16 @@ class EditableMindMapView extends ItemView {
     ["pointerdown", "pointermove", "pointerup", "click", "dblclick"].forEach((type) => {
       input.addEventListener(type, (event) => event.stopPropagation());
     });
-    input.addEventListener("blur", () => commit());
+    input.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (done) return;
+        if (Date.now() < toolbarInteractionUntil) {
+          input.focus({ preventScroll: true });
+          return;
+        }
+        commit();
+      }, 0);
+    });
   }
 
   toggleInlineFormat(input, marker) {
