@@ -8,7 +8,9 @@ A polished, directly editable mindmap view for ordinary Obsidian Markdown notes.
 
 ## Usage
 
-Open a Markdown note and run **Living Mindmap: Open editable mind map**.
+Open a Markdown note and run **Living Mindmap: Open editable mind map**, or choose **Open as mindmap** from the document's three-dot menu.
+
+On desktop, use the ribbon's **brain-circuit** icon or the command palette. On mobile, open the ribbon from Obsidian's sidebar or use the command palette.
 
 ## Commands and controls
 
@@ -43,6 +45,25 @@ These commands apply while the text editor is visible inside a node.
 | `Escape` | Cancel editing |
 
 On Linux and Windows, use `Ctrl`. On macOS, use `Cmd`.
+
+### Mobile and tablet
+
+Tap a node to select it. The action rail appears along the upper-right edge of the screen.
+
+| Input or control | Action |
+| --- | --- |
+| Tap a node | Select the node and show its actions |
+| Double-tap a node | Edit its text |
+| Drag an empty area with one finger | Pan the map |
+| Pinch with two fingers | Zoom in or out |
+| Edit | Open the selected node's text editor |
+| Add child | Create and edit a child node |
+| Add sibling | Create and edit a node at the same level |
+| Delete | Delete the selected branch, with confirmation when it has descendants |
+| Undo / Redo | Move backward or forward through mindmap changes |
+| `+` / `−` on a node | Expand or collapse that branch |
+
+While editing, use the on-screen controls for bold, italic, child, sibling, and Done. These controls work without a hardware keyboard.
 
 ### Canvas navigation and selection
 

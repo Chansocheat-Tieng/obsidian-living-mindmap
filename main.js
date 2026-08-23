@@ -1304,21 +1304,18 @@ class EditableMindMapPlugin extends Plugin {
     this.registerView(VIEW_TYPE, (leaf) => new EditableMindMapView(leaf, this));
     this.addRibbonIcon("brain-circuit", "Open editable mind map", () => this.openMindMap());
     this.addCommand({ id: "open-editable-mind-map", name: "Open editable mind map", callback: () => this.openMindMap() });
-    this.addCommand({ id: "toggle-editable-mind-map", name: "Toggle Markdown / mind map", checkCallback: (checking) => {
-      const active = this.app.workspace.getActiveViewOfType(EditableMindMapView);
-      const file = active?.file || this.app.workspace.getActiveFile();
-      if (!file) return false;
-      if (!checking) {
-        if (active) this.app.workspace.getLeaf(false).openFile(file);
-        else this.openMindMap();
-      }
-      return true;
-    }});
+    this.registerEvent(this.app.workspace.on("file-menu", (menu, file, source) => {
+      if (file?.extension !== "md" || !["more-options", "pane-more-options", "tab-header"].includes(source)) return;
+      menu.addItem((item) => item
+        .setTitle("Open as mindmap")
+        .setIcon("brain-circuit")
+        .setSection("pane")
+        .onClick(() => this.openMindMap(file)));
+    }));
     this.addSettingTab(new EditableMindMapSettingTab(this.app, this));
   }
 
-  async openMindMap() {
-    const file = this.app.workspace.getActiveFile();
+  async openMindMap(file = this.app.workspace.getActiveFile()) {
     if (!file || file.extension !== "md") return new Notice("Open a Markdown note first.");
     const leaf = this.app.workspace.getLeaf("tab");
     await leaf.setViewState({ type: VIEW_TYPE, active: true });
