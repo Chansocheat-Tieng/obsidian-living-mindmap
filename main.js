@@ -222,7 +222,7 @@ class EditableMindMapView extends ItemView {
 
   getViewType() { return VIEW_TYPE; }
   getDisplayText() { return this.file ? `${this.file.basename} — Mindmap` : "Living Mindmap"; }
-  getIcon() { return "git-fork"; }
+  getIcon() { return "brain-circuit"; }
 
   async onOpen() {
     this.contentEl.addClass("living-mindmap-view");
@@ -1299,7 +1299,7 @@ class EditableMindMapPlugin extends Plugin {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     if (this.settings.layout === "radial") this.settings.layout = "horizontal";
     this.registerView(VIEW_TYPE, (leaf) => new EditableMindMapView(leaf, this));
-    this.addRibbonIcon("git-fork", "Open editable mind map", () => this.openMindMap());
+    this.addRibbonIcon("brain-circuit", "Open editable mind map", () => this.openMindMap());
     this.addCommand({ id: "open-editable-mind-map", name: "Open editable mind map", callback: () => this.openMindMap() });
     this.addCommand({ id: "toggle-editable-mind-map", name: "Toggle Markdown / mind map", checkCallback: (checking) => {
       const active = this.app.workspace.getActiveViewOfType(EditableMindMapView);
