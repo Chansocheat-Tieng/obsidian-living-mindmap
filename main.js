@@ -828,6 +828,8 @@ class EditableMindMapView extends ItemView {
   async beginEdit(node, element) {
     if (node.empty) return this.createFirstTopic();
     if (!element || element.hasClass("is-editing")) return;
+    const shell = this.contentEl.querySelector(".emm-shell");
+    shell?.addClass("is-editing-node");
     element.addClass("is-editing");
     const input = element.createEl("textarea", { cls: "emm-editor" });
     input.value = node.rawText || node.text;
@@ -867,6 +869,7 @@ class EditableMindMapView extends ItemView {
     const commit = async (createMode = null) => {
       if (done) return; done = true;
       const value = input.value.trim();
+      shell?.removeClass("is-editing-node");
       element.removeClass("is-editing");
       input.remove();
       editActions?.remove();
@@ -896,7 +899,7 @@ class EditableMindMapView extends ItemView {
       }
       if (event.key === "Enter") { event.preventDefault(); commit(event.shiftKey ? "sibling" : null); }
       if (event.key === "Tab") { event.preventDefault(); commit(event.shiftKey ? "child" : null); }
-      if (event.key === "Escape") { done = true; element.removeClass("is-editing"); input.remove(); editActions?.remove(); }
+      if (event.key === "Escape") { done = true; shell?.removeClass("is-editing-node"); element.removeClass("is-editing"); input.remove(); editActions?.remove(); }
     });
     // Keep node selection and canvas panning handlers from capturing text-edit gestures.
     ["pointerdown", "pointermove", "pointerup", "click", "dblclick"].forEach((type) => {
