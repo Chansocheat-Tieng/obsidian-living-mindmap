@@ -635,8 +635,10 @@ class EditableMindMapView extends ItemView {
   drawEdges(svg, nodes, elements, layout, branchColors) {
     const canvasRect = svg.parentElement.getBoundingClientRect();
     svg.setAttrs({ width: "100%", height: "100%", viewBox: "-5000 -5000 10000 10000" });
-    for (const node of nodes) {
-      if (!node.parent) continue;
+    // SVG uses paint order: later paths appear on top. Draw distant branches first
+    // so connectors closest to the title remain visible where colored paths overlap.
+    const edgeNodes = nodes.filter((node) => node.parent).sort((a, b) => b.depth - a.depth);
+    for (const node of edgeNodes) {
       const parentEl = elements.get(node.parent.id);
       const nodeEl = elements.get(node.id);
       if (!parentEl || !nodeEl) continue;
