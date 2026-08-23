@@ -354,6 +354,11 @@ class EditableMindMapView extends ItemView {
           this.render(false);
         });
       }
+      let lastPointerWasTouch = false;
+      let lastTouchTap = 0;
+      el.addEventListener("pointerdown", (event) => {
+        lastPointerWasTouch = event.pointerType === "touch" && !event.target.closest(".emm-collapse, .emm-editor");
+      });
       el.addEventListener("click", (event) => {
         if (event.shiftKey) {
           this.selectedIds.has(node.id) ? this.selectedIds.delete(node.id) : this.selectedIds.add(node.id);
@@ -362,26 +367,16 @@ class EditableMindMapView extends ItemView {
         }
         this.selectedId = node.id;
         this.updateSelection(canvas); viewport.focus();
+        if (lastPointerWasTouch) {
+          const now = Date.now();
+          if (now - lastTouchTap < 350) {
+            lastTouchTap = 0;
+            window.setTimeout(() => this.beginEdit(node, el), 0);
+          } else lastTouchTap = now;
+        }
+        lastPointerWasTouch = false;
       });
       el.addEventListener("dblclick", (event) => { event.preventDefault(); this.beginEdit(node, el); });
-      let touchStart = null;
-      let lastTouchTap = 0;
-      el.addEventListener("pointerdown", (event) => {
-        if (event.pointerType !== "touch" || event.target.closest(".emm-collapse, .emm-editor")) return;
-        touchStart = { x: event.clientX, y: event.clientY };
-      });
-      el.addEventListener("pointerup", (event) => {
-        if (event.pointerType !== "touch" || !touchStart || event.target.closest(".emm-collapse, .emm-editor")) return;
-        const moved = Math.hypot(event.clientX - touchStart.x, event.clientY - touchStart.y);
-        touchStart = null;
-        if (moved > 10) return;
-        const now = Date.now();
-        if (now - lastTouchTap < 350) {
-          event.preventDefault();
-          lastTouchTap = 0;
-          window.setTimeout(() => this.beginEdit(node, el), 0);
-        } else lastTouchTap = now;
-      });
       el.addEventListener("contextmenu", (event) => {
         if (node.id === "root") return;
         event.preventDefault();
