@@ -331,7 +331,9 @@ class EditableMindMapView extends ItemView {
         : node.kind === "heading" ? `is-heading heading-level-${node.level || 2}` : "is-content";
       const el = canvas.createDiv({ cls: `emm-node ${roleClass}` });
       el.dataset.nodeId = node.id;
-      if (this.selectedIds.has(node.id)) el.addClass("is-selected");
+      const isSelected = this.selectedIds.has(node.id);
+      if (isSelected) el.addClass("is-selected");
+      el.setAttr("aria-selected", String(isSelected));
       el.addClass("is-wrapped");
       el.style.maxWidth = `${props.nodeWidth}px`;
       el.style.left = `${node.x}px`;
@@ -780,7 +782,11 @@ class EditableMindMapView extends ItemView {
   }
 
   updateSelection(canvas) {
-    canvas.querySelectorAll(".emm-node").forEach((el) => el.toggleClass("is-selected", this.selectedIds.has(el.dataset.nodeId)));
+    canvas.querySelectorAll(".emm-node").forEach((el) => {
+      const isSelected = this.selectedIds.has(el.dataset.nodeId);
+      el.toggleClass("is-selected", isSelected);
+      el.setAttr("aria-selected", String(isSelected));
+    });
     this.updateMobileActions();
   }
 
