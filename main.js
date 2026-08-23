@@ -820,7 +820,21 @@ class EditableMindMapView extends ItemView {
       const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label } });
       if (button) {
         setIcon(button, icon);
-        button.addEventListener("pointerdown", (event) => event.preventDefault()); button.addEventListener("click", action);
+        let lastActivation = 0;
+        const activate = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const now = Date.now();
+          if (now - lastActivation < 400) return;
+          lastActivation = now;
+          action();
+          if (input.isConnected) input.focus({ preventScroll: true });
+        };
+        // Mobile browsers blur the textarea before dispatching click. Run the
+        // action at gesture start and suppress the later synthetic click.
+        button.addEventListener("touchstart", activate, { passive: false });
+        button.addEventListener("pointerdown", activate);
+        button.addEventListener("click", activate);
       }
     };
     let done = false;
