@@ -222,7 +222,7 @@ class EditableMindMapView extends ItemView {
 
   getViewType() { return VIEW_TYPE; }
   getDisplayText() { return this.file ? `${this.file.basename} — Mindmap` : "Living Mindmap"; }
-  getIcon() { return "git-fork"; }
+  getIcon() { return "brain-circuit"; }
 
   async onOpen() {
     this.contentEl.addClass("living-mindmap-view");
@@ -828,6 +828,8 @@ class EditableMindMapView extends ItemView {
   async beginEdit(node, element) {
     if (node.empty) return this.createFirstTopic();
     if (!element || element.hasClass("is-editing")) return;
+    const shell = this.contentEl.querySelector(".emm-shell");
+    shell?.addClass("is-editing-node");
     element.addClass("is-editing");
     const input = element.createEl("textarea", { cls: "emm-editor" });
     input.value = node.rawText || node.text;
@@ -867,6 +869,7 @@ class EditableMindMapView extends ItemView {
     const commit = async (createMode = null) => {
       if (done) return; done = true;
       const value = input.value.trim();
+      shell?.removeClass("is-editing-node");
       element.removeClass("is-editing");
       input.remove();
       editActions?.remove();
@@ -896,7 +899,7 @@ class EditableMindMapView extends ItemView {
       }
       if (event.key === "Enter") { event.preventDefault(); commit(event.shiftKey ? "sibling" : null); }
       if (event.key === "Tab") { event.preventDefault(); commit(event.shiftKey ? "child" : null); }
-      if (event.key === "Escape") { done = true; element.removeClass("is-editing"); input.remove(); editActions?.remove(); }
+      if (event.key === "Escape") { done = true; shell?.removeClass("is-editing-node"); element.removeClass("is-editing"); input.remove(); editActions?.remove(); }
     });
     // Keep node selection and canvas panning handlers from capturing text-edit gestures.
     ["pointerdown", "pointermove", "pointerup", "click", "dblclick"].forEach((type) => {
@@ -1299,23 +1302,20 @@ class EditableMindMapPlugin extends Plugin {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     if (this.settings.layout === "radial") this.settings.layout = "horizontal";
     this.registerView(VIEW_TYPE, (leaf) => new EditableMindMapView(leaf, this));
-    this.addRibbonIcon("git-fork", "Open editable mind map", () => this.openMindMap());
-    this.addCommand({ id: "open-editable-mind-map", name: "Open editable mind map", callback: () => this.openMindMap() });
-    this.addCommand({ id: "toggle-editable-mind-map", name: "Toggle Markdown / mind map", checkCallback: (checking) => {
-      const active = this.app.workspace.getActiveViewOfType(EditableMindMapView);
-      const file = active?.file || this.app.workspace.getActiveFile();
-      if (!file) return false;
-      if (!checking) {
-        if (active) this.app.workspace.getLeaf(false).openFile(file);
-        else this.openMindMap();
-      }
-      return true;
-    }});
+    this.addRibbonIcon("brain-circuit", "Open as Mindmap", () => this.openMindMap());
+    this.addCommand({ id: "open-editable-mind-map", name: "Open as Mindmap", callback: () => this.openMindMap() });
+    this.registerEvent(this.app.workspace.on("file-menu", (menu, file, source) => {
+      if (file?.extension !== "md" || !["more-options", "pane-more-options", "tab-header"].includes(source)) return;
+      menu.addItem((item) => item
+        .setTitle("Open as Mindmap")
+        .setIcon("brain-circuit")
+        .setSection("pane")
+        .onClick(() => this.openMindMap(file)));
+    }));
     this.addSettingTab(new EditableMindMapSettingTab(this.app, this));
   }
 
-  async openMindMap() {
-    const file = this.app.workspace.getActiveFile();
+  async openMindMap(file = this.app.workspace.getActiveFile()) {
     if (!file || file.extension !== "md") return new Notice("Open a Markdown note first.");
     const leaf = this.app.workspace.getLeaf("tab");
     await leaf.setViewState({ type: VIEW_TYPE, active: true });
