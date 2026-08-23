@@ -38,12 +38,8 @@
 .living-mindmap-view .emm-canvas .emm-node[aria-selected="true"] {
   border-color: var(--interactive-accent);
   outline: 1px solid var(--interactive-accent);
-  outline-offset: 2px;
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 55%, transparent),
-    0 0 0 1px var(--background-primary),
-    0 0 0 3px color-mix(in srgb, var(--interactive-accent) 65%, transparent),
-    0 6px 18px rgb(0 0 0 / 22%);
+  outline-offset: 1px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 18%);
 }
 .emm-node.is-heading.heading-level-2 { font-size: 1.04em; }
 .emm-node.is-heading.heading-level-3 { border-left-color: color-mix(in srgb, var(--interactive-accent) 70%, var(--text-muted)); font-size: 1em; }
