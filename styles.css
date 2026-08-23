@@ -26,6 +26,9 @@
 .emm-canvas.is-vertical-layout .emm-node.is-heading { border-left-width: 1px; border-top: 4px solid var(--interactive-accent); }
 .emm-canvas.is-vertical-layout .emm-node[style*="--emm-branch-color"].is-heading { border-left-color: var(--background-modifier-border); border-top-color: var(--emm-branch-color); }
 .emm-node[style*="--emm-branch-color"].is-content { border-color: color-mix(in srgb, var(--emm-branch-color) 65%, var(--background-modifier-border)); background: color-mix(in srgb, var(--emm-branch-color) 10%, var(--background-primary-alt)); }
+.living-mindmap-view .emm-canvas .emm-node:is(.is-title, .is-heading) {
+  background-color: var(--background-secondary-alt);
+}
 .emm-canvas .emm-node.is-selected {
   border-color: var(--interactive-accent);
   outline: 3px solid var(--interactive-accent);
