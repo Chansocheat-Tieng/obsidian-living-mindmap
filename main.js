@@ -364,6 +364,24 @@ class EditableMindMapView extends ItemView {
         this.updateSelection(canvas); viewport.focus();
       });
       el.addEventListener("dblclick", (event) => { event.preventDefault(); this.beginEdit(node, el); });
+      let touchStart = null;
+      let lastTouchTap = 0;
+      el.addEventListener("pointerdown", (event) => {
+        if (event.pointerType !== "touch" || event.target.closest(".emm-collapse, .emm-editor")) return;
+        touchStart = { x: event.clientX, y: event.clientY };
+      });
+      el.addEventListener("pointerup", (event) => {
+        if (event.pointerType !== "touch" || !touchStart || event.target.closest(".emm-collapse, .emm-editor")) return;
+        const moved = Math.hypot(event.clientX - touchStart.x, event.clientY - touchStart.y);
+        touchStart = null;
+        if (moved > 10) return;
+        const now = Date.now();
+        if (now - lastTouchTap < 350) {
+          event.preventDefault();
+          lastTouchTap = 0;
+          window.setTimeout(() => this.beginEdit(node, el), 0);
+        } else lastTouchTap = now;
+      });
       el.addEventListener("contextmenu", (event) => {
         if (node.id === "root") return;
         event.preventDefault();
@@ -814,6 +832,7 @@ class EditableMindMapView extends ItemView {
 
   async beginEdit(node, element) {
     if (node.empty) return this.createFirstTopic();
+    if (!element || element.hasClass("is-editing")) return;
     element.addClass("is-editing");
     const input = element.createEl("textarea", { cls: "emm-editor" });
     input.value = node.rawText || node.text;
