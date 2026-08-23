@@ -1,7 +1,7 @@
 {
   "id": "living-mindmap",
   "name": "Living Mindmap",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
   "description": "Turn Markdown headings and lists into polished, directly editable mindmaps.",
   "author": "Chansocheat Tieng",

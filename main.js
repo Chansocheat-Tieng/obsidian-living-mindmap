@@ -213,6 +213,7 @@ class EditableMindMapView extends ItemView {
     this.modifyTimer = null;
     this.undoStack = [];
     this.redoStack = [];
+    this.mobileActions = null;
   }
 
   getViewType() { return VIEW_TYPE; }
@@ -221,6 +222,7 @@ class EditableMindMapView extends ItemView {
 
   async onOpen() {
     this.contentEl.addClass("living-mindmap-view");
+    this.contentEl.toggleClass("is-tablet-layout", Boolean(Platform.isMobile && !Platform.isPhone));
     this.registerDomEvent(window, "keydown", (event) => {
       if (this.app.workspace.getActiveViewOfType(EditableMindMapView) !== this) return;
       if (!primaryModifier(event)) return;
@@ -304,6 +306,7 @@ class EditableMindMapView extends ItemView {
     const props = readMindmapProperties(this.markdown, this.plugin.settings);
     const shell = this.contentEl.createDiv({ cls: "emm-shell" });
     this.renderToolbar(shell, props);
+    this.renderMobileActions(shell);
     const viewport = shell.createDiv({ cls: "emm-viewport", attr: { tabindex: "0" } });
     const canvas = viewport.createDiv({ cls: "emm-canvas" });
     canvas.toggleClass("is-horizontal-layout", props.layout === "horizontal");
@@ -327,7 +330,9 @@ class EditableMindMapView extends ItemView {
         : node.kind === "heading" ? `is-heading heading-level-${node.level || 2}` : "is-content";
       const el = canvas.createDiv({ cls: `emm-node ${roleClass}` });
       el.dataset.nodeId = node.id;
-      if (this.selectedIds.has(node.id)) el.addClass("is-selected");
+      const isSelected = this.selectedIds.has(node.id);
+      if (isSelected) el.addClass("is-selected");
+      el.setAttr("aria-selected", String(isSelected));
       el.addClass("is-wrapped");
       el.style.maxWidth = `${props.nodeWidth}px`;
       el.style.left = `${node.x}px`;
@@ -472,6 +477,68 @@ class EditableMindMapView extends ItemView {
     addSlider("Sibling gap", "verticalGap", this.plugin.settings.verticalGap, 10, 120, 5);
   }
 
+  renderMobileActions(shell) {
+    const actions = shell.createDiv({ cls: "emm-mobile-actions", attr: { "aria-label": "Selected node actions" } });
+    const button = (icon, title, action, cls = "") => {
+      const el = actions.createEl("button", { cls: `emm-mobile-action ${cls}`, attr: { "aria-label": title, title } });
+      setIcon(el, icon);
+      el.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); action(); });
+      return el;
+    };
+    button("pencil", "Edit", () => this.editSelectedNode());
+    button("list-tree", "Add child", () => this.addFromMobile(true));
+    button("list-plus", "Add sibling", () => this.addFromMobile(false));
+    button("trash-2", "Delete", () => this.deleteFromMobile(), "is-danger");
+    button("undo-2", "Undo", () => this.undo());
+    button("redo-2", "Redo", () => this.redo());
+    this.mobileActions = actions;
+    this.updateMobileActions();
+  }
+
+  selectedNode() {
+    return this.tree?.flat.find((node) => node.id === this.selectedId) || null;
+  }
+
+  editSelectedNode() {
+    const node = this.selectedNode();
+    const element = this.contentEl.querySelector(`.emm-node[data-node-id="${node?.id || ""}"]`);
+    if (node && element) this.beginEdit(node, element);
+  }
+
+  async addFromMobile(child) {
+    const node = this.selectedNode();
+    if (!node) return;
+    await this.insertRelative(node, child);
+    requestAnimationFrame(() => this.editSelectedNode());
+  }
+
+  async deleteFromMobile() {
+    const roots = this.selectedRoots();
+    if (!roots.length) return;
+    const descendants = roots.reduce((total, node) => total + Math.max(0, this.subtreeNodeCount(node) - 1), 0);
+    if (descendants > 0 && !window.confirm(`Delete ${roots.length === 1 ? "this node" : `${roots.length} nodes`} and ${descendants} descendant${descendants === 1 ? "" : "s"}?`)) return;
+    await this.deleteSelectedNodes();
+    new Notice("Node deleted. Use Undo to restore it.");
+  }
+
+  subtreeNodeCount(node) {
+    return 1 + (node.children || []).reduce((sum, child) => sum + this.subtreeNodeCount(child), 0);
+  }
+
+  updateMobileActions() {
+    if (!this.mobileActions) return;
+    const node = this.selectedNode();
+    this.mobileActions.toggleClass("is-visible", Boolean(node));
+    const sibling = this.mobileActions.querySelector('[aria-label="Add sibling"]');
+    const remove = this.mobileActions.querySelector('[aria-label="Delete"]');
+    const undo = this.mobileActions.querySelector('[aria-label="Undo"]');
+    const redo = this.mobileActions.querySelector('[aria-label="Redo"]');
+    if (sibling) sibling.disabled = !node || node.id === "root";
+    if (remove) remove.disabled = !node || node.id === "root";
+    if (undo) undo.disabled = this.undoStack.length === 0;
+    if (redo) redo.disabled = this.redoStack.length === 0;
+  }
+
   async onClose() {
     window.clearTimeout(this.modifyTimer);
     this.loadSequence += 1;
@@ -568,8 +635,14 @@ class EditableMindMapView extends ItemView {
   drawEdges(svg, nodes, elements, layout, branchColors) {
     const canvasRect = svg.parentElement.getBoundingClientRect();
     svg.setAttrs({ width: "100%", height: "100%", viewBox: "-5000 -5000 10000 10000" });
-    for (const node of nodes) {
-      if (!node.parent) continue;
+    // SVG uses paint order: later paths appear on top. Use geometric distance,
+    // rather than depth alone, so overlapping sibling connectors near the title
+    // are also painted from farthest (behind) to nearest (in front).
+    const title = nodes.find((node) => !node.parent) || { x: 0, y: 0 };
+    const distanceFromTitle = (node) => Math.hypot(node.x - title.x, node.y - title.y);
+    const edgeNodes = nodes.filter((node) => node.parent).sort((a, b) =>
+      distanceFromTitle(b) - distanceFromTitle(a) || b.depth - a.depth);
+    for (const node of edgeNodes) {
       const parentEl = elements.get(node.parent.id);
       const nodeEl = elements.get(node.id);
       if (!parentEl || !nodeEl) continue;
@@ -595,13 +668,37 @@ class EditableMindMapView extends ItemView {
 
   bindViewport(viewport, canvas) {
     let panning = false, selecting = false, startX = 0, startY = 0, originX = 0, originY = 0, marquee = null;
+    const touches = new Map();
+    let pinchDistance = 0, pinchScale = 1, pinchPanX = 0, pinchPanY = 0, pinchCenterX = 0, pinchCenterY = 0;
     viewport.addEventListener("contextmenu", (event) => {
       if (!event.target.closest(".emm-node, .emm-toolbar")) event.preventDefault();
     });
+    // Keep horizontal map gestures inside the view instead of opening Obsidian's mobile sidebars.
+    viewport.addEventListener("touchstart", (event) => {
+      if (!event.target.closest(".emm-editor")) event.stopPropagation();
+    }, { passive: true });
+    viewport.addEventListener("touchmove", (event) => {
+      if (event.target.closest(".emm-editor")) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false });
     viewport.addEventListener("pointerdown", (event) => {
-      if (event.target.closest(".emm-node, .emm-toolbar")) return;
+      if (event.pointerType === "touch") {
+        touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        viewport.setPointerCapture(event.pointerId);
+        if (touches.size === 2) {
+          const [a, b] = [...touches.values()];
+          const rect = viewport.getBoundingClientRect();
+          pinchDistance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          pinchScale = this.scale; pinchPanX = this.panX; pinchPanY = this.panY;
+          pinchCenterX = (a.x + b.x) / 2 - rect.left - rect.width / 2;
+          pinchCenterY = (a.y + b.y) / 2 - rect.top - rect.height / 2;
+          panning = false;
+        }
+        if (event.target.closest(".emm-node, .emm-toolbar, .emm-mobile-actions, .emm-mobile-edit-actions")) return;
+      } else if (event.target.closest(".emm-node, .emm-toolbar, .emm-mobile-actions, .emm-mobile-edit-actions")) return;
       startX = event.clientX; startY = event.clientY;
-      if (event.button === 2) {
+      if (event.pointerType === "touch" || event.button === 2) {
         panning = true; originX = this.panX; originY = this.panY;
         viewport.addClass("is-panning");
       } else if (event.button === 0) {
@@ -613,6 +710,23 @@ class EditableMindMapView extends ItemView {
       viewport.setPointerCapture(event.pointerId);
     });
     viewport.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "touch" && touches.has(event.pointerId)) {
+        touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (touches.size >= 2) {
+          const [a, b] = [...touches.values()];
+          const rect = viewport.getBoundingClientRect();
+          const distance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          const centerX = (a.x + b.x) / 2 - rect.left - rect.width / 2;
+          const centerY = (a.y + b.y) / 2 - rect.top - rect.height / 2;
+          const nextScale = Math.min(2.5, Math.max(0.25, pinchScale * distance / pinchDistance));
+          const ratio = nextScale / pinchScale;
+          this.panX = centerX - pinchCenterX + pinchCenterX - (pinchCenterX - pinchPanX) * ratio;
+          this.panY = centerY - pinchCenterY + pinchCenterY - (pinchCenterY - pinchPanY) * ratio;
+          this.scale = nextScale;
+          this.applyTransform(canvas);
+          return;
+        }
+      }
       if (panning) {
         this.panX = originX + event.clientX - startX;
         this.panY = originY + event.clientY - startY;
@@ -625,7 +739,8 @@ class EditableMindMapView extends ItemView {
         marquee.style.width = `${Math.abs(x2 - x1)}px`; marquee.style.height = `${Math.abs(y2 - y1)}px`;
       }
     });
-    const stop = () => {
+    const stop = (event) => {
+      if (event?.pointerType === "touch") touches.delete(event.pointerId);
       if (selecting && marquee) {
         const selectionRect = marquee.getBoundingClientRect();
         canvas.querySelectorAll(".emm-node").forEach((element) => {
@@ -638,6 +753,7 @@ class EditableMindMapView extends ItemView {
         this.updateSelection(canvas); marquee.remove(); marquee = null;
       }
       panning = false; selecting = false; viewport.removeClass("is-panning");
+      if (touches.size < 2) pinchDistance = 0;
     };
     viewport.addEventListener("pointerup", stop);
     viewport.addEventListener("pointercancel", stop);
@@ -670,7 +786,12 @@ class EditableMindMapView extends ItemView {
   }
 
   updateSelection(canvas) {
-    canvas.querySelectorAll(".emm-node").forEach((el) => el.toggleClass("is-selected", this.selectedIds.has(el.dataset.nodeId)));
+    canvas.querySelectorAll(".emm-node").forEach((el) => {
+      const isSelected = this.selectedIds.has(el.dataset.nodeId);
+      el.toggleClass("is-selected", isSelected);
+      el.setAttr("aria-selected", String(isSelected));
+    });
+    this.updateMobileActions();
   }
 
   dropMode(element, event, layout) {
@@ -694,16 +815,30 @@ class EditableMindMapView extends ItemView {
     input.value = node.rawText || node.text;
     input.rows = 1;
     input.focus(); input.select();
+    const editActions = this.contentEl.querySelector(".emm-shell")?.createDiv({ cls: "emm-mobile-edit-actions" });
+    const editButton = (label, icon, action) => {
+      const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label } });
+      if (button) {
+        setIcon(button, icon);
+        button.addEventListener("pointerdown", (event) => event.preventDefault()); button.addEventListener("click", action);
+      }
+    };
     let done = false;
     const commit = async (createMode = null) => {
       if (done) return; done = true;
       const value = input.value.trim();
       element.removeClass("is-editing");
       input.remove();
+      editActions?.remove();
       if (!value && !node.children.length) await this.deleteNode(node);
       else if (value && value !== node.rawText) await this.renameNode(node, value);
       if (createMode && value) await this.insertRelative(node, createMode === "child");
     };
+    editButton("Bold", "bold", () => this.toggleInlineFormat(input, "**"));
+    editButton("Italic", "italic", () => this.toggleInlineFormat(input, "*"));
+    editButton("Add child", "list-tree", () => commit("child"));
+    editButton("Add sibling", "list-plus", () => commit("sibling"));
+    editButton("Done", "check", () => commit());
     input.addEventListener("keydown", (event) => {
       event.stopPropagation();
       if (primaryModifier(event) && ["b", "i"].includes(shortcutLetter(event))) {
@@ -721,7 +856,7 @@ class EditableMindMapView extends ItemView {
       }
       if (event.key === "Enter") { event.preventDefault(); commit(event.shiftKey ? "sibling" : null); }
       if (event.key === "Tab") { event.preventDefault(); commit(event.shiftKey ? "child" : null); }
-      if (event.key === "Escape") { done = true; element.removeClass("is-editing"); input.remove(); }
+      if (event.key === "Escape") { done = true; element.removeClass("is-editing"); input.remove(); editActions?.remove(); }
     });
     // Keep node selection and canvas panning handlers from capturing text-edit gestures.
     ["pointerdown", "pointermove", "pointerup", "click", "dblclick"].forEach((type) => {
