@@ -824,7 +824,7 @@ class EditableMindMapView extends ItemView {
     editActions?.addEventListener("touchstart", preserveEditorForToolbar, { capture: true, passive: false });
     editActions?.addEventListener("pointerdown", preserveEditorForToolbar, { capture: true });
     const editButton = (label, icon, action) => {
-      const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label } });
+      const button = editActions?.createEl("button", { cls: "emm-mobile-edit-action", attr: { "aria-label": label, title: label, type: "button", tabindex: "-1" } });
       if (button) {
         setIcon(button, icon);
         let lastActivation = 0;
@@ -887,7 +887,9 @@ class EditableMindMapView extends ItemView {
     input.addEventListener("blur", () => {
       window.setTimeout(() => {
         if (done) return;
-        if (Date.now() < toolbarInteractionUntil) {
+        // Mobile focus transitions are inconsistent and can happen before a
+        // toolbar click. Keep the editor alive until an explicit action ends it.
+        if (Platform.isMobile || Date.now() < toolbarInteractionUntil) {
           input.focus({ preventScroll: true });
           return;
         }
