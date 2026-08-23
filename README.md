@@ -2,6 +2,10 @@
 
 A polished, directly editable mindmap view for ordinary Obsidian Markdown notes.
 
+<p align="center">
+  <img src="assets/living-mindmap-demo.gif" alt="Living Mindmap editing a Markdown note" width="520">
+</p>
+
 ## Usage
 
 Open a Markdown note and run **Living Mindmap: Open editable mind map**.
