@@ -37,9 +37,12 @@ jobs:
           cmp main.js release-assets/main.js
           cmp styles.css release-assets/styles.css
 
-      - name: Attest release assets
-        uses: actions/attest-build-provenance@v3
+      - name: Attest main.js
+        uses: actions/attest@v4
         with:
-          subject-path: |
-            release-assets/main.js
-            release-assets/styles.css
+          subject-path: release-assets/main.js
+
+      - name: Attest styles.css
+        uses: actions/attest@v4
+        with:
+          subject-path: release-assets/styles.css
