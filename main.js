@@ -483,9 +483,11 @@ class EditableMindMapView extends ItemView {
       return el;
     };
     button("pencil", "Edit", () => this.editSelectedNode());
-    button("corner-down-right", "Add child", () => this.addFromMobile(true));
-    button("plus", "Add sibling", () => this.addFromMobile(false));
+    button("git-fork", "Add child", () => this.addFromMobile(true));
+    button("list-plus", "Add sibling", () => this.addFromMobile(false));
     button("trash-2", "Delete", () => this.deleteFromMobile(), "is-danger");
+    button("undo-2", "Undo", () => this.undo());
+    button("redo-2", "Redo", () => this.redo());
     this.mobileActions = actions;
     this.updateMobileActions();
   }
@@ -526,8 +528,12 @@ class EditableMindMapView extends ItemView {
     this.mobileActions.toggleClass("is-visible", Boolean(node));
     const sibling = this.mobileActions.querySelector('[aria-label="Add sibling"]');
     const remove = this.mobileActions.querySelector('[aria-label="Delete"]');
+    const undo = this.mobileActions.querySelector('[aria-label="Undo"]');
+    const redo = this.mobileActions.querySelector('[aria-label="Redo"]');
     if (sibling) sibling.disabled = !node || node.id === "root";
     if (remove) remove.disabled = !node || node.id === "root";
+    if (undo) undo.disabled = this.undoStack.length === 0;
+    if (redo) redo.disabled = this.redoStack.length === 0;
   }
 
   async onClose() {
@@ -653,11 +659,26 @@ class EditableMindMapView extends ItemView {
 
   bindViewport(viewport, canvas) {
     let panning = false, selecting = false, startX = 0, startY = 0, originX = 0, originY = 0, marquee = null;
+    const touches = new Map();
+    let pinchDistance = 0, pinchScale = 1, pinchPanX = 0, pinchPanY = 0, pinchCenterX = 0, pinchCenterY = 0;
     viewport.addEventListener("contextmenu", (event) => {
       if (!event.target.closest(".emm-node, .emm-toolbar")) event.preventDefault();
     });
     viewport.addEventListener("pointerdown", (event) => {
-      if (event.target.closest(".emm-node, .emm-toolbar")) return;
+      if (event.pointerType === "touch") {
+        touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        viewport.setPointerCapture(event.pointerId);
+        if (touches.size === 2) {
+          const [a, b] = [...touches.values()];
+          const rect = viewport.getBoundingClientRect();
+          pinchDistance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          pinchScale = this.scale; pinchPanX = this.panX; pinchPanY = this.panY;
+          pinchCenterX = (a.x + b.x) / 2 - rect.left - rect.width / 2;
+          pinchCenterY = (a.y + b.y) / 2 - rect.top - rect.height / 2;
+          panning = false;
+        }
+        if (event.target.closest(".emm-node, .emm-toolbar, .emm-mobile-actions, .emm-mobile-edit-actions")) return;
+      } else if (event.target.closest(".emm-node, .emm-toolbar, .emm-mobile-actions, .emm-mobile-edit-actions")) return;
       startX = event.clientX; startY = event.clientY;
       if (event.pointerType === "touch" || event.button === 2) {
         panning = true; originX = this.panX; originY = this.panY;
@@ -671,6 +692,23 @@ class EditableMindMapView extends ItemView {
       viewport.setPointerCapture(event.pointerId);
     });
     viewport.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "touch" && touches.has(event.pointerId)) {
+        touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (touches.size >= 2) {
+          const [a, b] = [...touches.values()];
+          const rect = viewport.getBoundingClientRect();
+          const distance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          const centerX = (a.x + b.x) / 2 - rect.left - rect.width / 2;
+          const centerY = (a.y + b.y) / 2 - rect.top - rect.height / 2;
+          const nextScale = Math.min(2.5, Math.max(0.25, pinchScale * distance / pinchDistance));
+          const ratio = nextScale / pinchScale;
+          this.panX = centerX - pinchCenterX + pinchCenterX - (pinchCenterX - pinchPanX) * ratio;
+          this.panY = centerY - pinchCenterY + pinchCenterY - (pinchCenterY - pinchPanY) * ratio;
+          this.scale = nextScale;
+          this.applyTransform(canvas);
+          return;
+        }
+      }
       if (panning) {
         this.panX = originX + event.clientX - startX;
         this.panY = originY + event.clientY - startY;
@@ -683,7 +721,8 @@ class EditableMindMapView extends ItemView {
         marquee.style.width = `${Math.abs(x2 - x1)}px`; marquee.style.height = `${Math.abs(y2 - y1)}px`;
       }
     });
-    const stop = () => {
+    const stop = (event) => {
+      if (event?.pointerType === "touch") touches.delete(event.pointerId);
       if (selecting && marquee) {
         const selectionRect = marquee.getBoundingClientRect();
         canvas.querySelectorAll(".emm-node").forEach((element) => {
@@ -696,6 +735,7 @@ class EditableMindMapView extends ItemView {
         this.updateSelection(canvas); marquee.remove(); marquee = null;
       }
       panning = false; selecting = false; viewport.removeClass("is-panning");
+      if (touches.size < 2) pinchDistance = 0;
     };
     viewport.addEventListener("pointerup", stop);
     viewport.addEventListener("pointercancel", stop);
@@ -771,8 +811,8 @@ class EditableMindMapView extends ItemView {
     };
     editButton("Bold", "bold", () => this.toggleInlineFormat(input, "**"));
     editButton("Italic", "italic", () => this.toggleInlineFormat(input, "*"));
-    editButton("Add child", "corner-down-right", () => commit("child"));
-    editButton("Add sibling", "plus", () => commit("sibling"));
+    editButton("Add child", "git-fork", () => commit("child"));
+    editButton("Add sibling", "list-plus", () => commit("sibling"));
     editButton("Done", "check", () => commit());
     input.addEventListener("keydown", (event) => {
       event.stopPropagation();
