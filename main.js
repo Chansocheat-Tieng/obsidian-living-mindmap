@@ -223,6 +223,7 @@ class EditableMindMapView extends ItemView {
 
   async onOpen() {
     this.contentEl.addClass("living-mindmap-view");
+    this.contentEl.toggleClass("is-tablet-layout", Boolean(Platform.isMobile && !Platform.isPhone));
     this.registerDomEvent(window, "keydown", (event) => {
       if (this.app.workspace.getActiveViewOfType(EditableMindMapView) !== this) return;
       if (!primaryModifier(event)) return;

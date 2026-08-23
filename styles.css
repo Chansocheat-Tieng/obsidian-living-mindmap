@@ -98,22 +98,39 @@
   }
 }
 
-@media (min-width: 601px) and (hover: none) and (pointer: coarse) {
-  .emm-node > .emm-collapse {
+body.is-tablet .living-mindmap-view .emm-node > button.emm-collapse,
+.living-mindmap-view.is-tablet-layout .emm-node > button.emm-collapse {
     box-sizing: border-box;
-    width: 16px;
-    min-width: 16px;
-    max-width: 16px;
-    height: 16px;
-    min-height: 16px;
+    appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    min-width: 14px;
+    max-width: 14px;
+    height: 14px;
+    min-height: 14px;
+    max-height: 14px;
+    inline-size: 14px;
+    min-inline-size: 14px;
+    max-inline-size: 14px;
+    block-size: 14px;
+    min-block-size: 14px;
+    max-block-size: 14px;
     padding: 0;
-    right: -8px;
+    margin: 0;
+    right: 0;
+    top: 50%;
+    transform: translate(50%, -50%);
     border-radius: 50%;
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1;
-  }
-  .emm-canvas.is-vertical-layout .emm-node > .emm-collapse {
+}
+body.is-tablet .living-mindmap-view .emm-canvas.is-vertical-layout .emm-node > button.emm-collapse,
+.living-mindmap-view.is-tablet-layout .emm-canvas.is-vertical-layout .emm-node > button.emm-collapse {
+    left: 50%;
     right: auto;
-    bottom: -8px;
-  }
+    top: auto;
+    bottom: 0;
+    transform: translate(-50%, 50%);
 }
