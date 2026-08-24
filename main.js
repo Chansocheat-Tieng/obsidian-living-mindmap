@@ -489,7 +489,7 @@ class EditableMindMapView extends ItemView {
       input.addEventListener("input", () => output.setText(`${input.value}px`));
       input.addEventListener("change", () => this.updateSetting(key, Number(input.value)));
     };
-    addSlider("Maximum node width", "nodeWidth", props.nodeWidth, 140, 600, 10);
+    addSlider("Maximum node width", "nodeWidth", props.nodeWidth, 140, 1200, 10);
     addSlider("Horizontal hierarchy gap", "horizontalGap", this.plugin.settings.horizontalGap, 40, 240, 5);
     addSlider("Vertical hierarchy gap", "parentChildGap", this.plugin.settings.parentChildGap, 30, 180, 5);
     addSlider("Sibling gap", "verticalGap", this.plugin.settings.verticalGap, 5, 120, 5);
@@ -814,7 +814,7 @@ class EditableMindMapView extends ItemView {
     viewport.addEventListener("wheel", (event) => {
       event.preventDefault();
       if (!event.deltaY) return;
-      const zoomFactor = 1.07;
+      const zoomFactor = 1.10;
       const previousScale = this.scale;
       const nextScale = Math.min(2.5, Math.max(0.25,
         previousScale * (event.deltaY > 0 ? 1 / zoomFactor : zoomFactor)));
@@ -1324,7 +1324,7 @@ class EditableMindMapSettingTab extends PluginSettingTab {
       .addDropdown((dropdown) => dropdown.addOptions({ horizontal: "Horizontal", vertical: "Vertical" })
         .setValue(this.plugin.settings.layout).onChange(async (value) => { this.plugin.settings.layout = value; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Maximum node width").setDesc("Text wraps when a node reaches this width.")
-      .addSlider((slider) => slider.setLimits(140, 600, 10).setDynamicTooltip().setValue(this.plugin.settings.nodeWidth)
+      .addSlider((slider) => slider.setLimits(140, 1200, 10).setDynamicTooltip().setValue(this.plugin.settings.nodeWidth)
         .onChange(async (value) => { this.plugin.settings.nodeWidth = value; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Spacing mode").setDesc("Align all depth levels globally or keep fixed gaps within each branch.")
       .addDropdown((dropdown) => dropdown.addOptions({ level: "Align levels", branch: "Compact branches" })
