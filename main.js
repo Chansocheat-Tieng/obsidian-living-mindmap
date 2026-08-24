@@ -427,6 +427,7 @@ class EditableMindMapView extends ItemView {
     Promise.all(renderTasks).then(() => requestAnimationFrame(() => {
         if (token !== this.renderToken) return;
         if (props.layout === "horizontal") {
+          this.alignHorizontalCrossAxis(laidOut, nodeElements);
           if (props.spacing === "branch") this.alignHorizontalBranches(laidOut, nodeElements);
           else this.alignHorizontalLevels(laidOut, nodeElements, "right");
         } else if (props.layout === "vertical") {
@@ -488,10 +489,10 @@ class EditableMindMapView extends ItemView {
       input.addEventListener("input", () => output.setText(`${input.value}px`));
       input.addEventListener("change", () => this.updateSetting(key, Number(input.value)));
     };
-    addSlider("Maximum node width", "nodeWidth", props.nodeWidth, 140, 600, 10);
+    addSlider("Maximum node width", "nodeWidth", props.nodeWidth, 140, 1200, 10);
     addSlider("Horizontal hierarchy gap", "horizontalGap", this.plugin.settings.horizontalGap, 40, 240, 5);
     addSlider("Vertical hierarchy gap", "parentChildGap", this.plugin.settings.parentChildGap, 30, 180, 5);
-    addSlider("Sibling gap", "verticalGap", this.plugin.settings.verticalGap, 10, 120, 5);
+    addSlider("Sibling gap", "verticalGap", this.plugin.settings.verticalGap, 5, 120, 5);
   }
 
   renderMobileActions(shell) {
@@ -588,6 +589,42 @@ class EditableMindMapView extends ItemView {
     }
   }
 
+  alignHorizontalCrossAxis(nodes, elements) {
+    const root = nodes.find((node) => !node.parent);
+    if (!root) return;
+    const siblingGap = Math.max(0, this.plugin.settings.verticalGap);
+    const heights = new Map();
+    for (const node of nodes) {
+      const height = elements.get(node.id)?.getBoundingClientRect().height || 38;
+      heights.set(node.id, height);
+    }
+
+    const subtreeHeights = new Map();
+    const measure = (node) => {
+      const childrenHeight = node.children.reduce((sum, child, index) =>
+        sum + measure(child) + (index ? siblingGap : 0), 0);
+      const height = Math.max(heights.get(node.id) || 0, childrenHeight);
+      subtreeHeights.set(node.id, height);
+      return height;
+    };
+    measure(root);
+
+    const place = (node, top) => {
+      const subtreeHeight = subtreeHeights.get(node.id);
+      node.y = top + subtreeHeight / 2;
+      const element = elements.get(node.id);
+      if (element) element.style.top = `${node.y}px`;
+      const totalChildrenHeight = node.children.reduce((sum, child, index) =>
+        sum + subtreeHeights.get(child.id) + (index ? siblingGap : 0), 0);
+      let childTop = top + (subtreeHeight - totalChildrenHeight) / 2;
+      for (const child of node.children) {
+        place(child, childTop);
+        childTop += subtreeHeights.get(child.id) + siblingGap;
+      }
+    };
+    place(root, -subtreeHeights.get(root.id) / 2);
+  }
+
   alignHorizontalBranches(nodes, elements) {
     const byDepth = [...nodes].sort((a, b) => a.depth - b.depth);
     const widths = new Map(nodes.map((node) => [node.id, elements.get(node.id)?.getBoundingClientRect().width || 0]));
@@ -603,7 +640,7 @@ class EditableMindMapView extends ItemView {
   alignVerticalLayout(nodes, elements, spacingMode = "level") {
     const root = nodes.find((node) => !node.parent);
     if (!root) return;
-    const siblingGap = Math.max(24, this.plugin.settings.verticalGap);
+    const siblingGap = Math.max(0, this.plugin.settings.verticalGap);
     const rowGap = this.plugin.settings.parentChildGap;
     const widths = new Map();
     const heights = new Map();
@@ -776,7 +813,18 @@ class EditableMindMapView extends ItemView {
     viewport.addEventListener("pointercancel", stop);
     viewport.addEventListener("wheel", (event) => {
       event.preventDefault();
-      this.scale = Math.min(2.5, Math.max(0.25, this.scale * (event.deltaY > 0 ? 0.9 : 1.1)));
+      if (!event.deltaY) return;
+      const zoomFactor = 1.10;
+      const previousScale = this.scale;
+      const nextScale = Math.min(2.5, Math.max(0.25,
+        previousScale * (event.deltaY > 0 ? 1 / zoomFactor : zoomFactor)));
+      const rect = viewport.getBoundingClientRect();
+      const cursorX = event.clientX - rect.left - rect.width / 2;
+      const cursorY = event.clientY - rect.top - rect.height / 2;
+      const ratio = nextScale / previousScale;
+      this.panX = cursorX - (cursorX - this.panX) * ratio;
+      this.panY = cursorY - (cursorY - this.panY) * ratio;
+      this.scale = nextScale;
       this.applyTransform(canvas);
     }, { passive: false });
   }
@@ -1276,7 +1324,7 @@ class EditableMindMapSettingTab extends PluginSettingTab {
       .addDropdown((dropdown) => dropdown.addOptions({ horizontal: "Horizontal", vertical: "Vertical" })
         .setValue(this.plugin.settings.layout).onChange(async (value) => { this.plugin.settings.layout = value; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Maximum node width").setDesc("Text wraps when a node reaches this width.")
-      .addSlider((slider) => slider.setLimits(140, 600, 10).setDynamicTooltip().setValue(this.plugin.settings.nodeWidth)
+      .addSlider((slider) => slider.setLimits(140, 1200, 10).setDynamicTooltip().setValue(this.plugin.settings.nodeWidth)
         .onChange(async (value) => { this.plugin.settings.nodeWidth = value; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Spacing mode").setDesc("Align all depth levels globally or keep fixed gaps within each branch.")
       .addDropdown((dropdown) => dropdown.addOptions({ level: "Align levels", branch: "Compact branches" })
@@ -1292,7 +1340,7 @@ class EditableMindMapSettingTab extends PluginSettingTab {
       .addSlider((slider) => slider.setLimits(40, 240, 5).setDynamicTooltip().setValue(this.plugin.settings.horizontalGap)
         .onChange(async (value) => { this.plugin.settings.horizontalGap = value; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Sibling gap").setDesc("Minimum space between neighboring sibling subtrees.")
-      .addSlider((slider) => slider.setLimits(10, 120, 5).setDynamicTooltip().setValue(this.plugin.settings.verticalGap)
+      .addSlider((slider) => slider.setLimits(5, 120, 5).setDynamicTooltip().setValue(this.plugin.settings.verticalGap)
         .onChange(async (value) => { this.plugin.settings.verticalGap = value; await this.plugin.saveSettings(); }));
   }
 }

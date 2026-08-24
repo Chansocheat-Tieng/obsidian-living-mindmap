@@ -3,7 +3,7 @@
 .emm-viewport { position: absolute; inset: 0; overflow: hidden; outline: none; cursor: crosshair; touch-action: none; }
 .emm-viewport.is-panning { cursor: grabbing; }
 .emm-selection-rectangle { position: absolute; z-index: 30; border: 1px solid var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 15%, transparent); pointer-events: none; }
-.emm-canvas { position: absolute; left: 50%; top: 50%; width: 1px; height: 1px; transform-origin: 0 0; will-change: transform; }
+.emm-canvas { position: absolute; left: 50%; top: 50%; width: 1px; height: 1px; transform-origin: 0 0; }
 .emm-canvas > svg.emm-edges { position: absolute; inset: -5000px; width: 10000px; height: 10000px; overflow: visible; pointer-events: none; }
 .emm-edge { fill: none; stroke: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border)); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .emm-node { position: absolute; transform: translate(-50%, -50%); min-width: 80px; min-height: 38px; padding: 9px 14px; border: 1px solid var(--background-modifier-border); border-radius: 11px; background: var(--background-secondary); color: var(--text-normal); box-shadow: 0 4px 14px rgb(0 0 0 / 12%); cursor: default; transition: border-color 120ms, box-shadow 120ms, background 120ms; z-index: 2; }
