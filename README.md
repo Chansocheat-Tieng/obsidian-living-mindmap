@@ -73,7 +73,7 @@ While editing, use the on-screen controls for bold, italic, child, sibling, and 
 | Shift-click a node | Add or remove it from the current selection |
 | Left-drag an empty area | Select multiple nodes with a selection rectangle |
 | Right-drag an empty area | Pan the view |
-| Mouse wheel | Zoom in or out |
+| Mouse wheel | Zoom in or out around the cursor in 10% steps |
 
 ### Drag and drop
 
@@ -107,18 +107,24 @@ Mind-map preferences are global and stored in the plugin's `data.json`, not in n
 | Setting | Purpose |
 | --- | --- |
 | Layout | Choose Horizontal or Vertical rendering |
-| Maximum node width | Set the width at which node text wraps |
+| Maximum node width | Set the wrapping width from 140px to 1200px |
 | Spacing mode | Align levels globally or compact each branch locally |
 | Branch colors | Color top-level branches and their connectors independently |
 | Horizontal hierarchy gap | Set the distance between hierarchy columns |
 | Vertical hierarchy gap | Set the distance between hierarchy rows |
-| Sibling gap | Set the minimum distance between sibling subtrees |
+| Sibling gap | Set 5px to 120px of edge-to-edge space between sibling subtrees |
 
-Node text always wraps at the configured maximum width. Shorter nodes keep their natural compact width.
+Node text always wraps at the configured maximum width. Shorter nodes keep their natural compact width. Sibling spacing uses the rendered node dimensions, so differently sized boxes retain the configured edge-to-edge gap in either layout.
 
 Enable **Compact branches** in the toolbar to keep parent-to-child gaps fixed within each branch. Disable it to align every depth into global columns.
 
 Enable **Branch colors** in the toolbar to give each top-level branch its own node and connector color.
+
+## Feedback and discussion
+
+Share feedback, questions, and ideas in the [Living Mindmap discussion on the Obsidian Forum](https://forum.obsidian.md/t/living-mindmap-new-editable-mind-map-view-for-markdown/117657).
+
+View Living Mindmap on the [Obsidian Community Plugins page](https://community.obsidian.md/plugins/living-mindmap).
 
 ## Author
 
