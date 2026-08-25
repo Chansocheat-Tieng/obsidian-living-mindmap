@@ -215,16 +215,29 @@ class EditableMindMapView extends ItemView {
     this.renderToken = 0;
     this.loadSequence = 0;
     this.modifyTimer = null;
+    this.startupRefreshTimer = null;
+    this.closed = false;
     this.undoStack = [];
     this.redoStack = [];
     this.mobileActions = null;
+    this.savedFilePath = null;
+    this.suppressContextMenuUntil = 0;
   }
 
   getViewType() { return VIEW_TYPE; }
   getDisplayText() { return this.file ? `${this.file.basename} — Mindmap` : "Living Mindmap"; }
   getIcon() { return "brain-circuit"; }
+  getState() { return { file: this.file?.path || this.savedFilePath || null }; }
+
+  async setState(state) {
+    this.savedFilePath = typeof state?.file === "string" ? state.file : null;
+    if (!this.savedFilePath) return;
+    const file = this.app.vault.getAbstractFileByPath(this.savedFilePath);
+    if (file?.extension === "md") await this.loadFile(file, true);
+  }
 
   async onOpen() {
+    this.closed = false;
     this.contentEl.addClass("living-mindmap-view");
     this.contentEl.toggleClass("is-tablet-layout", Boolean(isMobileRuntime() && !Platform.isPhone));
     this.registerDomEvent(window, "keydown", (event) => {
@@ -278,24 +291,49 @@ class EditableMindMapView extends ItemView {
       window.clearTimeout(this.modifyTimer);
       this.modifyTimer = window.setTimeout(() => this.loadFile(file, false), 60);
     }));
-    const active = this.app.workspace.getActiveFile();
-    if (active?.extension === "md") await this.loadFile(active);
-    else this.renderEmpty();
+    this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
+      if (leaf === this.leaf) this.scheduleLayoutRefresh();
+    }));
+    if (!this.file) {
+      const saved = this.savedFilePath ? this.app.vault.getAbstractFileByPath(this.savedFilePath) : null;
+      const active = this.app.workspace.getActiveFile();
+      if (saved?.extension === "md") await this.loadFile(saved);
+      else if (active?.extension === "md") await this.loadFile(active);
+      else this.renderEmpty();
+    }
+    this.app.workspace.onLayoutReady(() => this.scheduleLayoutRefresh());
+    document.fonts?.ready?.then(() => this.scheduleLayoutRefresh());
+  }
+
+  scheduleLayoutRefresh(delay = 60) {
+    window.clearTimeout(this.startupRefreshTimer);
+    this.startupRefreshTimer = window.setTimeout(() => {
+      if (this.closed || !this.file) return;
+      const rect = this.contentEl.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) this.render(false);
+    }, delay);
+  }
+
+  onResize() {
+    this.scheduleLayoutRefresh();
   }
 
   async loadFile(file, fit = true) {
     const sequence = ++this.loadSequence;
-    if (this.file?.path !== file.path) {
+    const fileChanged = this.file?.path !== file.path;
+    if (fileChanged) {
       this.undoStack.length = 0;
       this.redoStack.length = 0;
     }
     this.file = file;
+    this.savedFilePath = file.path;
     const markdown = await this.app.vault.read(file);
     if (sequence !== this.loadSequence) return;
     this.markdown = markdown;
     this.tree = parseMarkdownTree(this.markdown, file.basename);
     this.leaf.updateHeader();
     this.render(fit);
+    if (fileChanged) this.app.workspace.requestSaveLayout();
   }
 
   renderEmpty() {
@@ -378,6 +416,10 @@ class EditableMindMapView extends ItemView {
       });
       el.addEventListener("dblclick", (event) => { event.preventDefault(); this.beginEdit(node, el); });
       el.addEventListener("contextmenu", (event) => {
+        if (Date.now() < this.suppressContextMenuUntil) {
+          event.preventDefault(); event.stopPropagation();
+          return;
+        }
         if (node.id === "root") return;
         event.preventDefault();
         const menu = new Menu();
@@ -558,7 +600,9 @@ class EditableMindMapView extends ItemView {
   }
 
   async onClose() {
+    this.closed = true;
     window.clearTimeout(this.modifyTimer);
+    window.clearTimeout(this.startupRefreshTimer);
     this.loadSequence += 1;
   }
 
@@ -721,7 +765,8 @@ class EditableMindMapView extends ItemView {
   }
 
   bindViewport(viewport, canvas) {
-    let panning = false, selecting = false, startX = 0, startY = 0, originX = 0, originY = 0, marquee = null;
+    let panning = false, pendingRightPan = false, selecting = false;
+    let startX = 0, startY = 0, originX = 0, originY = 0, marquee = null;
     const touches = new Map();
     let pinchDistance = 0, pinchScale = 1, pinchPanX = 0, pinchPanY = 0, pinchCenterX = 0, pinchCenterY = 0;
     viewport.addEventListener("contextmenu", (event) => {
@@ -750,18 +795,24 @@ class EditableMindMapView extends ItemView {
           panning = false;
         }
         if (event.target.closest(".emm-node, .emm-toolbar, .emm-mobile-actions, .emm-mobile-edit-actions")) return;
-      } else if (event.target.closest(".emm-node, .emm-toolbar, .emm-mobile-actions, .emm-mobile-edit-actions")) return;
+      } else {
+        if (event.target.closest(".emm-toolbar, .emm-mobile-actions, .emm-mobile-edit-actions, .emm-editor, .emm-collapse")) return;
+        if (event.button !== 2 && event.target.closest(".emm-node")) return;
+      }
       startX = event.clientX; startY = event.clientY;
-      if (event.pointerType === "touch" || event.button === 2) {
+      if (event.pointerType === "touch") {
         panning = true; originX = this.panX; originY = this.panY;
         viewport.addClass("is-panning");
+      } else if (event.button === 2) {
+        this.suppressContextMenuUntil = 0;
+        pendingRightPan = true; originX = this.panX; originY = this.panY;
       } else if (event.button === 0) {
         selecting = true;
         if (!event.shiftKey) this.selectedIds.clear();
         marquee = viewport.createDiv({ cls: "emm-selection-rectangle" });
         marquee.style.left = `${event.offsetX}px`; marquee.style.top = `${event.offsetY}px`;
       } else return;
-      viewport.setPointerCapture(event.pointerId);
+      if (!pendingRightPan) viewport.setPointerCapture(event.pointerId);
     });
     viewport.addEventListener("pointermove", (event) => {
       if (event.pointerType === "touch" && touches.has(event.pointerId)) {
@@ -781,7 +832,16 @@ class EditableMindMapView extends ItemView {
           return;
         }
       }
+      if (pendingRightPan && Math.hypot(event.clientX - startX, event.clientY - startY) > 6) {
+        pendingRightPan = false;
+        panning = true;
+        viewport.setPointerCapture(event.pointerId);
+        viewport.addClass("is-panning");
+      }
       if (panning) {
+        if (event.pointerType !== "touch") {
+          this.suppressContextMenuUntil = Date.now() + 500;
+        }
         this.panX = originX + event.clientX - startX;
         this.panY = originY + event.clientY - startY;
         this.applyTransform(canvas);
@@ -806,7 +866,7 @@ class EditableMindMapView extends ItemView {
         this.selectedId = [...this.selectedIds].at(-1) || null;
         this.updateSelection(canvas); marquee.remove(); marquee = null;
       }
-      panning = false; selecting = false; viewport.removeClass("is-panning");
+      panning = false; pendingRightPan = false; selecting = false; viewport.removeClass("is-panning");
       if (touches.size < 2) pinchDistance = 0;
     };
     viewport.addEventListener("pointerup", stop);
