@@ -365,8 +365,12 @@ class EditableMindMapView extends ItemView {
     }
     const nodeElements = new Map();
     const renderTasks = [];
+    // Cache node measurements during a render so layout/edge/fit code each read
+    // the DOM once instead of forcing several synchronous reflows (the main
+    // cause of the freeze on notes with hundreds of nodes).
+    const rects = new Map();
 
-    for (const node of laidOut) {
+    const createNode = (node) => {
       const roleClass = node.id === "root"
         ? "is-title"
         : node.kind === "heading" ? `is-heading heading-level-${node.level || 2}` : "is-content";
@@ -381,9 +385,18 @@ class EditableMindMapView extends ItemView {
       el.style.top = `${node.y}px`;
       if (props.branchColors && node.branchColor) el.style.setProperty("--emm-branch-color", node.branchColor);
       const content = el.createDiv({ cls: "emm-node-content" });
-      renderTasks.push(MarkdownRenderer.render(this.app, node.rawText || node.text, content, this.file.path, this).catch(() => {
-        content.setText(node.text);
-      }));
+      const raw = node.rawText || node.text;
+      // Fast path: nodes with no Markdown syntax render faster as plain text than
+      // through Obsidian's heavy MarkdownRenderer. Typical large mindmaps are
+      // mostly plain list items, so this keeps hundreds of nodes cheap without
+      // changing what plain text looks like.
+      if (!/[*_`~\[\]#>!|<]/.test(raw)) {
+        content.setText(raw.replace(/\n/g, " "));
+      } else {
+        renderTasks.push(MarkdownRenderer.render(this.app, raw, content, this.file.path, this).catch(() => {
+          content.setText(node.text);
+        }));
+      }
       if (node.children.length || this.collapsed.has(node.id)) {
         const toggle = el.createEl("button", { cls: "emm-collapse", text: this.collapsed.has(node.id) ? "+" : "−" });
         toggle.addEventListener("click", (event) => {
@@ -464,23 +477,50 @@ class EditableMindMapView extends ItemView {
         if (sourceId && sourceId !== node.id) this.moveNodes([...this.selectedIds], node.id, mode);
       });
       nodeElements.set(node.id, el);
-    }
+    };
 
-    Promise.all(renderTasks).then(() => requestAnimationFrame(() => {
-        if (token !== this.renderToken) return;
-        if (props.layout === "horizontal") {
-          this.alignHorizontalCrossAxis(laidOut, nodeElements);
-          if (props.spacing === "branch") this.alignHorizontalBranches(laidOut, nodeElements);
-          else this.alignHorizontalLevels(laidOut, nodeElements, "right");
-        } else if (props.layout === "vertical") {
-          this.alignVerticalLayout(laidOut, nodeElements, props.spacing);
-        }
-        this.drawEdges(svg, laidOut, nodeElements, props.layout, props.branchColors);
-        if (fit) this.fitView(viewport, canvas, laidOut, nodeElements);
-        else this.applyTransform(canvas);
-      }));
+    // Time-slice node creation so a large note (hundreds of nodes) never blocks
+    // the main thread in one burst. The toolbar, viewport and canvas are already
+    // wired above, so panning and the toolbar buttons stay responsive while the
+    // nodes stream in in small chunks.
+    const CHUNK = 24;
+    let cursor = 0;
+    const buildChunk = () => {
+      if (this.closed || token !== this.renderToken) return;
+      const end = Math.min(cursor + CHUNK, laidOut.length);
+      for (; cursor < end; cursor += 1) createNode(laidOut[cursor]);
+      if (cursor < laidOut.length) {
+        requestAnimationFrame(buildChunk);
+        return;
+      }
+      Promise.all(renderTasks).then(() => requestAnimationFrame(() => this.finishRender(
+        token, fit, viewport, canvas, svg, laidOut, nodeElements, rects, props, nodes,
+      )));
+    };
+    buildChunk();
     this.bindViewport(viewport, canvas);
     viewport.addEventListener("keydown", (event) => this.handleKeydown(event, nodes, nodeElements));
+  }
+
+  finishRender(token, fit, viewport, canvas, svg, laidOut, nodeElements, rects, props, nodes) {
+    if (this.closed || token !== this.renderToken) return;
+    // Pass 1: measure widths/heights for the alignment passes. Width/height are
+    // invariant to the left/top that alignment writes, so they are captured once
+    // and shared instead of forcing a synchronous reflow per pass.
+    for (const node of laidOut) rects.set(node.id, nodeElements.get(node.id)?.getBoundingClientRect());
+    if (props.layout === "horizontal") {
+      this.alignHorizontalCrossAxis(laidOut, nodeElements, rects);
+      if (props.spacing === "branch") this.alignHorizontalBranches(laidOut, nodeElements, rects);
+      else this.alignHorizontalLevels(laidOut, nodeElements, "right", rects);
+    } else if (props.layout === "vertical") {
+      this.alignVerticalLayout(laidOut, nodeElements, props.spacing, rects);
+    }
+    // Pass 2: re-measure final positions (left/top/right/bottom) after alignment
+    // so edges and fit use the settled layout.
+    for (const node of laidOut) rects.set(node.id, nodeElements.get(node.id)?.getBoundingClientRect());
+    this.drawEdges(svg, laidOut, nodeElements, props.layout, props.branchColors, rects);
+    if (fit) this.fitView(viewport, canvas, laidOut, nodeElements, rects);
+    else this.applyTransform(canvas);
   }
 
   renderToolbar(shell, props) {
@@ -606,11 +646,12 @@ class EditableMindMapView extends ItemView {
     this.loadSequence += 1;
   }
 
-  alignHorizontalLevels(nodes, elements, direction) {
+  alignHorizontalLevels(nodes, elements, direction, rects = new Map()) {
     const widths = new Map();
     const maxDepth = Math.max(...nodes.map((node) => node.depth));
     for (const node of nodes) {
-      const width = elements.get(node.id)?.getBoundingClientRect().width || 0;
+      const rect = rects.get(node.id);
+      const width = rect ? rect.width : (elements.get(node.id)?.getBoundingClientRect().width || 0);
       widths.set(node.depth, Math.max(widths.get(node.depth) || 0, width));
     }
     const right = [0];
@@ -633,13 +674,14 @@ class EditableMindMapView extends ItemView {
     }
   }
 
-  alignHorizontalCrossAxis(nodes, elements) {
+  alignHorizontalCrossAxis(nodes, elements, rects = new Map()) {
     const root = nodes.find((node) => !node.parent);
     if (!root) return;
     const siblingGap = Math.max(0, this.plugin.settings.verticalGap);
     const heights = new Map();
     for (const node of nodes) {
-      const height = elements.get(node.id)?.getBoundingClientRect().height || 38;
+      const rect = rects.get(node.id);
+      const height = rect ? rect.height : (elements.get(node.id)?.getBoundingClientRect().height || 38);
       heights.set(node.id, height);
     }
 
@@ -669,9 +711,12 @@ class EditableMindMapView extends ItemView {
     place(root, -subtreeHeights.get(root.id) / 2);
   }
 
-  alignHorizontalBranches(nodes, elements) {
+  alignHorizontalBranches(nodes, elements, rects = new Map()) {
     const byDepth = [...nodes].sort((a, b) => a.depth - b.depth);
-    const widths = new Map(nodes.map((node) => [node.id, elements.get(node.id)?.getBoundingClientRect().width || 0]));
+    const widths = new Map(nodes.map((node) => {
+      const rect = rects.get(node.id);
+      return [node.id, rect ? rect.width : (elements.get(node.id)?.getBoundingClientRect().width || 0)];
+    }));
     for (const node of byDepth) {
       node.x = node.parent
         ? node.parent.x + (widths.get(node.parent.id) || 0) + this.plugin.settings.horizontalGap
@@ -681,7 +726,7 @@ class EditableMindMapView extends ItemView {
     }
   }
 
-  alignVerticalLayout(nodes, elements, spacingMode = "level") {
+  alignVerticalLayout(nodes, elements, spacingMode = "level", rects = new Map()) {
     const root = nodes.find((node) => !node.parent);
     if (!root) return;
     const siblingGap = Math.max(0, this.plugin.settings.verticalGap);
@@ -690,7 +735,7 @@ class EditableMindMapView extends ItemView {
     const heights = new Map();
     const rowHeights = new Map();
     for (const node of nodes) {
-      const rect = elements.get(node.id)?.getBoundingClientRect();
+      const rect = rects.get(node.id) || elements.get(node.id)?.getBoundingClientRect();
       widths.set(node.id, rect?.width || 80);
       heights.set(node.id, rect?.height || 38);
       rowHeights.set(node.depth, Math.max(rowHeights.get(node.depth) || 0, rect?.height || 38));
@@ -730,7 +775,7 @@ class EditableMindMapView extends ItemView {
     place(root, -subtreeWidths.get(root.id) / 2);
   }
 
-  drawEdges(svg, nodes, elements, layout, branchColors) {
+  drawEdges(svg, nodes, elements, layout, branchColors, rects = new Map()) {
     const canvasRect = svg.parentElement.getBoundingClientRect();
     svg.setAttrs({ width: "100%", height: "100%", viewBox: "-5000 -5000 10000 10000" });
     // SVG uses paint order: later paths appear on top. Use geometric distance,
@@ -741,11 +786,9 @@ class EditableMindMapView extends ItemView {
     const edgeNodes = nodes.filter((node) => node.parent).sort((a, b) =>
       distanceFromTitle(b) - distanceFromTitle(a) || b.depth - a.depth);
     for (const node of edgeNodes) {
-      const parentEl = elements.get(node.parent.id);
-      const nodeEl = elements.get(node.id);
-      if (!parentEl || !nodeEl) continue;
-      const a = parentEl.getBoundingClientRect();
-      const b = nodeEl.getBoundingClientRect();
+      const a = rects.get(node.parent.id);
+      const b = rects.get(node.id);
+      if (!a || !b) continue;
       const horizontal = layout === "horizontal"
         ? true
         : layout === "vertical" ? false : Math.abs(node.x - node.parent.x) >= Math.abs(node.y - node.parent.y);
@@ -893,13 +936,14 @@ class EditableMindMapView extends ItemView {
     canvas.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
   }
 
-  fitView(viewport, canvas, nodes, elements) {
+  fitView(viewport, canvas, nodes, elements, rects = new Map()) {
     if (!nodes.length) return;
-    const rects = nodes.map((node) => elements.get(node.id)?.getBoundingClientRect()).filter(Boolean);
-    const minX = Math.min(...rects.map((r) => r.left));
-    const maxX = Math.max(...rects.map((r) => r.right));
-    const minY = Math.min(...rects.map((r) => r.top));
-    const maxY = Math.max(...rects.map((r) => r.bottom));
+    const rectsList = nodes.map((node) => rects.get(node.id)).filter(Boolean);
+    if (!rectsList.length) return;
+    const minX = Math.min(...rectsList.map((r) => r.left));
+    const maxX = Math.max(...rectsList.map((r) => r.right));
+    const minY = Math.min(...rectsList.map((r) => r.top));
+    const maxY = Math.max(...rectsList.map((r) => r.bottom));
     const width = Math.max(1, maxX - minX), height = Math.max(1, maxY - minY);
     this.scale = Math.min(1.25, Math.max(0.25, Math.min((viewport.clientWidth - 100) / width, (viewport.clientHeight - 100) / height)));
     const viewportRect = viewport.getBoundingClientRect();
